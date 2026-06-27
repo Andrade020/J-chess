@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 104" width="90" height="104" style="--skin:#ad7544;--skinSh:#3a3640">
+  <g stroke="#2a201a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" style="paint-order:stroke">
+    <ellipse cx="45" cy="99" rx="24" ry="3.6" fill="rgba(0,0,0,.16)" stroke="none"></ellipse>
+    <rect x="40.5" y="62" width="9" height="22" rx="2" style="fill:var(--skin)" stroke-width="2.6"></rect>
+    <path d="M24,86 Q28,75 33,84 Q37,75 41,84 Q45,76 49,84 Q53,75 57,84 Q62,75 66,86 Q56,94 45,95 Q34,94 24,86 Z" style="fill:var(--skinSh)" stroke-width="2.6"></path>
+      <line x1="56" y1="22" x2="71" y2="9" stroke="#b8b2a4" stroke-width="2.2" stroke-linecap="round"></line>
+      <line x1="55" y1="20" x2="60" y2="25" stroke="#7a6a4a" stroke-width="2.6" stroke-linecap="round"></line>
+      <path d="M20,32 Q45,26 70,32 Q45,38 20,32 Z" fill="#23212a" stroke-width="3"></path>
+      <path d="M33,32 C33,20 57,20 57,32 Z" fill="#23212a" stroke-width="3"></path>
+      <path style="fill:var(--skin)" d="M34,40 C34,34 56,34 56,40 C56,51 50,61 45,62 C40,61 34,51 34,40 Z" stroke-width="3"></path>
+      <path d="M34,42 C34,37 56,37 56,42 C56,46 53,48 50,47 C48,46 47,47 45,48 C43,47 42,46 40,47 C37,48 34,46 34,42 Z" fill="#0f0e12" stroke-width="2.2"></path>
+      <circle cx="40" cy="44" r="2.4" fill="#d8c84a" stroke-width="1.4"></circle>
+      <circle cx="50" cy="44" r="2.4" fill="#d8c84a" stroke-width="1.4"></circle>
+      <circle cx="40" cy="44.4" r="1.1" fill="#2a201a" stroke="none"></circle>
+      <circle cx="50" cy="44.4" r="1.1" fill="#2a201a" stroke="none"></circle>
+      <path d="M38,54 q7,3 14,0" fill="none" stroke-width="1.8"></path>
+      <path d="M42,57 q3,6 6,0 q-3,3 -6,0 Z" fill="#1a1814" stroke-width="1.8"></path>
+  </g>
+</svg>

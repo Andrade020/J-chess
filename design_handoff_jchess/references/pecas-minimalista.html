@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J-Chess — Peças (Folha de Referência)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&family=Noto+Serif+JP:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3f2ee;
+    --card:#fbfbf9;
+    --ink:#16161a;
+    --line:#e3e1da;
+    --line2:#d6d3ca;
+    --muted:#8d897e;
+    --tile:#eceae3;
+    --tile-dark:#16161a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hanken Grotesk", system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  .wrap{ max-width:1120px; margin:0 auto; padding:64px 40px 96px; }
+
+  /* ---------- header ---------- */
+  header{ margin-bottom:56px; }
+  .eyebrow{
+    font-family:"Space Mono", monospace;
+    font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 18px;
+  }
+  h1{
+    font-family:"Space Grotesk", sans-serif;
+    font-weight:700; font-size:64px; line-height:.96; letter-spacing:-.02em;
+    margin:0;
+  }
+  h1 .jp{ font-family:"Noto Serif JP", serif; font-weight:500; font-size:.5em; color:var(--muted); margin-left:.4em; letter-spacing:0; }
+  .lede{
+    max-width:620px; margin:20px 0 0; font-size:17px; color:#3a3833;
+  }
+  .lede b{ font-weight:600; color:var(--ink); }
+  .rule{ height:1px; background:var(--ink); margin:36px 0 0; }
+
+  /* ---------- section heads ---------- */
+  .sec-head{ display:flex; align-items:baseline; gap:16px; margin:64px 0 26px; }
+  .sec-head .num{ font-family:"Space Mono",monospace; font-size:13px; color:var(--muted); }
+  .sec-head h2{
+    font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:26px; letter-spacing:-.01em; margin:0;
+  }
+  .sec-head .hint{ margin-left:auto; font-size:13.5px; color:var(--muted); max-width:380px; text-align:right; }
+
+  /* ---------- base piece grid ---------- */
+  .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:18px; }
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:22px 24px;
+    display:grid; grid-template-columns:104px 1fr auto; gap:22px; align-items:center;
+  }
+  .art{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .art .stage{
+    width:104px; height:104px; border-radius:12px; background:var(--tile);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .art .stage svg{ width:78px; height:86px; }
+  .art .chips{ display:flex; gap:6px; align-items:center; }
+  .art .chip{
+    width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center;
+  }
+  .art .chip.lt{ background:#fff; border:1px solid var(--line2); }
+  .art .chip.dk{ background:var(--ink); }
+  .art .chip svg{ width:24px; height:26px; }
+  .art .chip-lab{ font-family:"Space Mono",monospace; font-size:10px; color:var(--muted); letter-spacing:.04em; }
+
+  .meta h3{ font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:21px; margin:0 0 3px; letter-spacing:-.01em; }
+  .meta .jp-line{ font-size:13px; color:var(--muted); margin:0 0 11px; }
+  .meta .jp-line .kanji{ font-family:"Noto Serif JP",serif; font-size:16px; color:#56524a; margin-right:7px; }
+  .meta .desc{ font-size:14.5px; color:#403e38; margin:0; max-width:34ch; }
+  .meta .role{
+    display:inline-block; margin-bottom:11px;
+    font-family:"Space Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--line2); border-radius:20px; padding:3px 10px;
+  }
+
+  .move{ display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .move .mgrid{ width:90px; height:90px; display:block; border:1px solid var(--line2); border-radius:6px; }
+  .move .mlab{ font-family:"Space Mono",monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+
+  /* ---------- promotions ---------- */
+  .promo-intro{ max-width:680px; font-size:15px; color:#403e38; margin:0 0 24px; }
+  .promo-intro b{ font-weight:600; color:var(--ink); }
+  .prow{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 22px; display:grid; grid-template-columns:1fr 64px 1fr 96px; gap:18px; align-items:center;
+    margin-bottom:14px;
+  }
+  .pside{ display:flex; align-items:center; gap:16px; }
+  .pside .stage{ width:72px; height:72px; border-radius:10px; background:var(--tile); display:flex; align-items:center; justify-content:center; flex:none; }
+  .pside.is-promo .stage{ background:var(--tile-dark); }
+  .pside .stage svg{ width:54px; height:60px; }
+  .pside .txt h4{ font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:16px; margin:0 0 2px; }
+  .pside .txt .sub{ font-size:12px; color:var(--muted); }
+  .pside .txt .sub .kanji{ font-family:"Noto Serif JP",serif; color:#56524a; margin-right:5px; }
+  .pside .txt .nm{ font-size:12px; color:var(--muted); margin-top:5px; max-width:24ch; }
+  .arrow{ display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); }
+  .arrow svg{ width:30px; height:14px; }
+  .arrow .tag{ font-family:"Space Mono",monospace; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; }
+  .prow .move{ justify-self:center; }
+  .prow .move .mgrid{ width:80px; height:80px; }
+
+  /* ---------- legend ---------- */
+  .legend{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:14px; }
+  .lcard{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
+  .lcard .ic{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; border-radius:9px; background:var(--tile); }
+  .lcard .ic svg{ width:28px; height:28px; }
+  .lcard h4{ font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:15px; margin:0 0 6px; }
+  .lcard p{ font-size:13px; color:#403e38; margin:0; }
+  .lcard p .kanji{ font-family:"Noto Serif JP",serif; }
+
+  footer{ margin-top:64px; padding-top:24px; border-top:1px solid var(--line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; }
+  footer .note{ font-size:12.5px; color:var(--muted); max-width:560px; }
+  footer .sig{ font-family:"Space Mono",monospace; font-size:11px; color:var(--muted); letter-spacing:.06em; }
+
+  /* piece color contexts */
+  .white-piece{ --pc-fill:#ffffff; --pc-stroke:#16161a; --pc-mark:#16161a; --pc-cut:#16161a; }
+  .black-piece{ --pc-fill:#16161a; --pc-stroke:#16161a; --pc-mark:#f3f2ee; --pc-cut:#f3f2ee; }
+  .body{ fill:var(--pc-fill); stroke:var(--pc-stroke); stroke-width:1.4; stroke-linejoin:round; }
+  .mark{ fill:var(--pc-mark); stroke:none; }
+  .cut{ fill:var(--pc-cut); stroke:none; }
+
+  @media (max-width:880px){
+    .wrap{ padding:44px 22px 72px; }
+    h1{ font-size:46px; }
+    .grid{ grid-template-columns:1fr; }
+    .legend{ grid-template-columns:1fr; }
+    .card{ grid-template-columns:88px 1fr; }
+    .move{ grid-column:1 / -1; flex-direction:row; justify-content:flex-start; gap:14px; margin-top:4px; }
+    .prow{ grid-template-columns:1fr; gap:14px; }
+    .arrow{ flex-direction:row; }
+    .sec-head .hint{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== SVG SYMBOLS ===================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+
+  <symbol id="p-pawn" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M34,89 C32,79 40,75 40,70 H50 C50,75 58,79 56,89 Z"/>
+      <rect class="body" x="37" y="66" width="16" height="5" rx="2.5"/>
+      <circle class="body" cx="45" cy="55" r="10"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-rook" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M33,89 C32,80 36,78 36,73 H54 C54,78 58,80 57,89 Z"/>
+      <rect class="body" x="32" y="63" width="26" height="9" rx="1.5"/>
+      <rect class="body" x="32" y="55" width="5.5" height="9"/>
+      <rect class="body" x="42.25" y="55" width="5.5" height="9"/>
+      <rect class="body" x="52.5" y="55" width="5.5" height="9"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-bishop" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M34,89 C32,80 39,76 41,71 H49 C51,76 58,80 56,89 Z"/>
+      <rect class="body" x="38" y="67" width="14" height="5" rx="2.5"/>
+      <path class="body" d="M45,37 C54,44 55,58 45,68 C35,58 36,44 45,37 Z"/>
+      <circle class="body" cx="45" cy="33" r="3.6"/>
+      <rect class="cut" x="44" y="44" width="2.4" height="13" rx="1.2" transform="rotate(32 45 50)"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-king" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M32,89 C30,80 37,76 39,71 H51 C53,76 60,80 58,89 Z"/>
+      <rect class="body" x="37" y="66" width="16" height="6" rx="2"/>
+      <path class="body" d="M38,67 L52,67 L50,54 C48,57 42,57 40,54 Z"/>
+      <rect class="body" x="43" y="38" width="4" height="15" rx="1"/>
+      <rect class="body" x="39" y="42" width="12" height="4" rx="1"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-marshal" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M34,89 C32,80 36,74 36,72 C36,66 32,64 33,61 C35,57 40,56 41,54 H49 C50,56 55,57 57,61 C58,64 54,66 54,72 C54,74 58,80 56,89 Z"/>
+      <rect class="body" x="42" y="50" width="6" height="6"/>
+      <use href="#star" x="34.5" y="33" width="21" height="21" class="body"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-vanguard" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M34,89 C32,80 36,74 36,72 C36,66 32,64 33,61 C35,57 40,56 41,54 H49 C50,56 55,57 57,61 C58,64 54,66 54,72 C54,74 58,80 56,89 Z"/>
+      <path class="body" d="M32,56 L45,34 L58,56 L49,56 L45,48 L41,56 Z"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-knight" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M33,89 C32,82 35,80 36,76 H56 C57,82 58,84 57,89 Z"/>
+      <path class="body" d="M36,76
+        C34,66 36,58 44,52
+        C42,50 40,49 38,49
+        C40,46 43,44 47,43
+        C46,40 47,37 49,35
+        C51,38 52,41 53,44
+        C58,47 62,53 62,62
+        C62,68 60,73 57,76 Z"/>
+      <circle class="cut" cx="50" cy="49" r="1.7"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-lancer" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M30,96 H60 L55,89 H35 Z"/>
+      <path class="body" d="M37,89 C36,83 41,80 41,76 H49 C49,80 54,83 53,89 Z"/>
+      <rect class="body" x="43" y="40" width="4" height="36" rx="1"/>
+      <path class="body" d="M45,28 L49.5,42 H40.5 Z"/>
+    </g>
+  </symbol>
+
+  <symbol id="star" viewBox="0 0 24 24">
+    <path d="M12 1.5 L14.9 8.6 L22.5 9.2 L16.7 14.1 L18.6 21.5 L12 17.4 L5.4 21.5 L7.3 14.1 L1.5 9.2 L9.1 8.6 Z"/>
+  </symbol>
+
+  <symbol id="p-pawn-plus" viewBox="0 0 90 100">
+    <use href="#p-pawn"/>
+    <use href="#star" x="38.5" y="48.5" width="13" height="13" class="mark"/>
+  </symbol>
+  <symbol id="p-lancer-plus" viewBox="0 0 90 100">
+    <use href="#p-lancer"/>
+    <use href="#star" x="39" y="25" width="12" height="12" class="mark"/>
+  </symbol>
+  <symbol id="p-knight-plus" viewBox="0 0 90 100">
+    <use href="#p-knight"/>
+    <use href="#star" x="39" y="60" width="12" height="12" class="mark"/>
+  </symbol>
+  <symbol id="p-vanguard-plus" viewBox="0 0 90 100">
+    <use href="#p-vanguard"/>
+    <use href="#star" x="39" y="62" width="12" height="12" class="mark"/>
+  </symbol>
+
+  <symbol id="p-dragonking" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M37,67 C26,64 16,55 13,41 C20,47 28,50 33,54 C31,57 33,60 32,63 C35,62 37,63 39,64 Z"/>
+      <path class="body" d="M53,67 C64,64 74,55 77,41 C70,47 62,50 57,54 C59,57 57,60 58,63 C55,62 53,63 51,64 Z"/>
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M33,89 C32,80 36,78 36,73 H54 C54,78 58,80 57,89 Z"/>
+      <rect class="body" x="32" y="63" width="26" height="9" rx="1.5"/>
+      <rect class="body" x="32" y="55" width="5.5" height="9"/>
+      <rect class="body" x="42.25" y="55" width="5.5" height="9"/>
+      <rect class="body" x="52.5" y="55" width="5.5" height="9"/>
+      <use href="#star" x="38.5" y="75" width="13" height="13" class="mark"/>
+    </g>
+  </symbol>
+
+  <symbol id="p-dragonhorse" viewBox="0 0 90 100">
+    <g class="piece">
+      <path class="body" d="M38,68 C27,65 17,56 14,42 C21,48 29,51 34,55 C32,58 34,61 33,64 C36,63 38,64 40,65 Z"/>
+      <path class="body" d="M52,68 C63,65 73,56 76,42 C69,48 61,51 56,55 C58,58 56,61 57,64 C54,63 52,64 50,65 Z"/>
+      <path class="body" d="M27,96 H63 L58,89 H32 Z"/>
+      <path class="body" d="M34,89 C32,80 39,76 41,72 H49 C51,76 58,80 56,89 Z"/>
+      <rect class="body" x="38" y="68" width="14" height="5" rx="2.5"/>
+      <path class="body" d="M45,40 C53,46 54,58 45,67 C36,58 37,46 45,40 Z"/>
+      <circle class="body" cx="45" cy="36" r="3.4"/>
+      <rect class="cut" x="44" y="46" width="2.2" height="12" rx="1.1" transform="rotate(32 45 52)"/>
+    </g>
+  </symbol>
+
+</defs></svg>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Shogi ocidentalizado · Conjunto de peças</p>
+    <h1>J-Chess<span class="jp">将棋</span></h1>
+    <p class="lede">Uma releitura do <b>shogi</b> com silhuetas no estilo do xadrez ocidental. As peças com paralelo direto mantêm a forma clássica; as exclusivas do shogi ganham desenhos novos com tema medieval. <b>Cor define o dono</b> (claro × escuro) no lugar da orientação tradicional.</p>
+    <div class="rule"></div>
+  </header>
+
+  <!-- ===== SECTION 1: BASE PIECES ===== -->
+  <div class="sec-head">
+    <span class="num">01</span>
+    <h2>As peças</h2>
+    <span class="hint">Nos diagramas de movimento, o avanço (“frente”) é para cima ↑. ● = passo · seta = desliza até onde puder.</span>
+  </div>
+
+  <div class="grid" id="baseGrid"></div>
+
+  <!-- ===== SECTION 2: PROMOTIONS ===== -->
+  <div class="sec-head">
+    <span class="num">02</span>
+    <h2>Promoções</h2>
+    <span class="hint">No shogi a peça é virada ao promover. Aqui, como a cor já marca o dono, a promoção é sinalizada pelo desenho.</span>
+  </div>
+  <p class="promo-intro">Ao alcançar o campo inimigo, seis peças promovem. As quatro menores recebem a <b>estrela do Marechal</b> ★ e passam a se mover como ele. Torre e Bispo viram <b>Dragões</b> — ganham asas e somam o passo do Rei ao seu alcance.</p>
+  <div id="promoList"></div>
+
+  <!-- ===== SECTION 3: LEGEND ===== -->
+  <div class="sec-head">
+    <span class="num">03</span>
+    <h2>Sistema</h2>
+  </div>
+  <div class="legend">
+    <div class="lcard">
+      <div class="ic"><svg viewBox="0 0 24 24" class="white-piece"><use href="#star" class="mark"/></svg></div>
+      <h4>Estrela = poder do Marechal</h4>
+      <p>Soldado, Lanceiro, Cavaleiro e Vanguarda promovidos passam a andar como o Marechal (general de ouro <span class="kanji">金</span>): seis direções.</p>
+    </div>
+    <div class="lcard">
+      <div class="ic"><svg viewBox="0 0 90 100" class="black-piece"><use href="#p-dragonking"/></svg></div>
+      <h4>Asas = Dragão</h4>
+      <p>Só a Torre e o Bispo viram Dragões (<span class="kanji">龍</span>). Mantêm o deslize original e somam o passo de uma casa do Rei.</p>
+    </div>
+    <div class="lcard">
+      <div class="ic" style="gap:5px"><svg viewBox="0 0 90 100" class="white-piece" style="width:18px;height:20px"><use href="#p-pawn"/></svg><svg viewBox="0 0 90 100" class="black-piece" style="width:18px;height:20px"><use href="#p-pawn"/></svg></div>
+      <h4>Claro × escuro</h4>
+      <p>Cada peça existe nas duas cores. A clara é de um jogador, a escura do outro — substituindo a orientação por cor, como no xadrez.</p>
+    </div>
+  </div>
+
+  <footer>
+    <p class="note">Cada peça é um símbolo SVG reutilizável (<span style="font-family:'Space Mono',monospace">#p-pawn</span>, <span style="font-family:'Space Mono',monospace">#p-king</span>, …) com cores controladas por variáveis CSS — prontas para reaproveitar no jogo 2D.</p>
+    <p class="sig">J-CHESS · v1 · folha de referência</p>
+  </footer>
+
+</div>
+
+<script>
+  /* ---------------- data ---------------- */
+  const goldMove = {steps:[[0,-1],[-1,-1],[1,-1],[-1,0],[1,0],[0,1]]};
+  const dragonKing = {slide:[[0,-1],[0,1],[-1,0],[1,0]], steps:[[-1,-1],[1,-1],[-1,1],[1,1]]};
+  const dragonHorse = {slide:[[-1,-1],[1,-1],[-1,1],[1,1]], steps:[[0,-1],[0,1],[-1,0],[1,0]]};
+
+  const PIECES = [
+    {sym:'p-king',    name:'Rei',       jp:'王将', romaji:'Ōshō',    mean:'general-rei',         role:'Núcleo',   desc:'Uma casa em qualquer direção. Perdê-lo encerra a partida.', move:{steps:[[0,-1],[-1,-1],[1,-1],[-1,0],[1,0],[0,1],[-1,1],[1,1]]}},
+    {sym:'p-rook',    name:'Torre',     jp:'飛車', romaji:'Hisha',   mean:'carro voador',        role:'Equivalente ao xadrez', desc:'Desliza nas ortogonais por qualquer distância.', move:{slide:[[0,-1],[0,1],[-1,0],[1,0]]}},
+    {sym:'p-bishop',  name:'Bispo',     jp:'角行', romaji:'Kakugyō', mean:'condutor de ângulo',  role:'Equivalente ao xadrez', desc:'Desliza nas diagonais por qualquer distância.', move:{slide:[[-1,-1],[1,-1],[-1,1],[1,1]]}},
+    {sym:'p-marshal', name:'Marechal',  jp:'金将', romaji:'Kinshō',  mean:'general de ouro',     role:'Peça nova · general', desc:'Seis direções: as quatro ortogonais e as duas diagonais da frente.', move:goldMove},
+    {sym:'p-vanguard',name:'Vanguarda', jp:'銀将', romaji:'Ginshō',  mean:'general de prata',    role:'Peça nova · general', desc:'Para a frente e nas quatro diagonais. Ágil, mas não anda de lado nem recua reto.', move:{steps:[[0,-1],[-1,-1],[1,-1],[-1,1],[1,1]]}},
+    {sym:'p-knight',  name:'Cavaleiro', jp:'桂馬', romaji:'Keima',   mean:'cavalo de canela',    role:'Equivalente ao xadrez', desc:'Salta para uma das duas casas dianteiras em “L”. Só avança, nunca recua.', move:{steps:[[-1,-2],[1,-2]]}},
+    {sym:'p-lancer',  name:'Lanceiro',  jp:'香車', romaji:'Kyōsha',  mean:'carro perfumado',     role:'Peça nova · lança', desc:'Desliza para a frente por qualquer distância — e só para a frente.', move:{slide:[[0,-1]]}},
+    {sym:'p-pawn',    name:'Soldado',   jp:'歩兵', romaji:'Fuhyō',   mean:'soldado de pé',       role:'Equivalente ao xadrez', desc:'Uma casa para a frente. Captura em frente (não na diagonal, ao contrário do xadrez).', move:{steps:[[0,-1]]}},
+  ];
+
+  const PROMOS = [
+    {base:'p-pawn',    baseName:'Soldado',  bjp:'歩兵', sym:'p-pawn-plus',    name:'Tokin',           jp:'と金', nm:'soldado promovido',  move:goldMove},
+    {base:'p-lancer',  baseName:'Lanceiro', bjp:'香車', sym:'p-lancer-plus',  name:'Lanceiro+',       jp:'成香', nm:'lança promovida',    move:goldMove},
+    {base:'p-knight',  baseName:'Cavaleiro',bjp:'桂馬', sym:'p-knight-plus',  name:'Cavaleiro+',      jp:'成桂', nm:'cavalo promovido',   move:goldMove},
+    {base:'p-vanguard',baseName:'Vanguarda',bjp:'銀将', sym:'p-vanguard-plus',name:'Vanguarda+',      jp:'成銀', nm:'prata promovida',    move:goldMove},
+    {base:'p-bishop',  baseName:'Bispo',    bjp:'角行', sym:'p-dragonhorse',  name:'Cavalo Dragão',   jp:'龍馬', nm:'bispo + passo do rei', move:dragonHorse},
+    {base:'p-rook',    baseName:'Torre',    bjp:'飛車', sym:'p-dragonking',   name:'Rei Dragão',      jp:'龍王', nm:'torre + passo do rei', move:dragonKing},
+  ];
+
+  /* ---------------- move grid ---------------- */
+  function arrowhead(x,y,dx,dy){
+    const L=Math.hypot(dx,dy), ux=dx/L, uy=dy/L, s=4.6;
+    const bx=x-ux*s, by=y-uy*s, px=-uy, py=ux;
+    return `<path d="M${x},${y} L${bx+px*s*0.72},${by+py*s*0.72} L${bx-px*s*0.72},${by-py*s*0.72} Z" fill="#16161a"/>`;
+  }
+  function moveGrid(spec){
+    const S=18, N=5, sz=N*S;
+    let cells='';
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+      cells+=`<rect x="${c*S}" y="${r*S}" width="${S}" height="${S}" fill="${(r+c)%2?'#e7e5de':'#f4f3ef'}"/>`;
+    }
+    const ccx=2*S+S/2, ccy=2*S+S/2;
+    let m=`<rect x="${2*S+4}" y="${2*S+4}" width="${S-8}" height="${S-8}" rx="2.5" fill="#16161a"/>`;
+    (spec.slide||[]).forEach(([dx,dy])=>{
+      const ex=(2+dx*2)*S+S/2, ey=(2+dy*2)*S+S/2;
+      const sx=ccx+dx*9, sy=ccy+dy*9;
+      m+=`<line x1="${sx}" y1="${sy}" x2="${ex-dx*4}" y2="${ey-dy*4}" stroke="#16161a" stroke-width="2.4" stroke-linecap="round"/>`;
+      m+=arrowhead(ex,ey,dx,dy);
+    });
+    (spec.steps||[]).forEach(([dx,dy])=>{
+      const x=(2+dx)*S+S/2, y=(2+dy)*S+S/2;
+      m+=`<circle cx="${x}" cy="${y}" r="3.6" fill="#16161a"/>`;
+    });
+    return `<svg viewBox="0 0 ${sz} ${sz}" class="mgrid">${cells}${m}</svg>`;
+  }
+
+  /* ---------------- render base ---------------- */
+  const bg = document.getElementById('baseGrid');
+  bg.innerHTML = PIECES.map(p=>`
+    <div class="card">
+      <div class="art">
+        <div class="stage"><svg viewBox="0 0 90 100" class="black-piece"><use href="#${p.sym}"/></svg></div>
+        <div class="chips">
+          <div class="chip lt"><svg viewBox="0 0 90 100" class="white-piece"><use href="#${p.sym}"/></svg></div>
+          <div class="chip dk"><svg viewBox="0 0 90 100" class="black-piece"><use href="#${p.sym}"/></svg></div>
+          <span class="chip-lab">2 cores</span>
+        </div>
+      </div>
+      <div class="meta">
+        <span class="role">${p.role}</span>
+        <h3>${p.name}</h3>
+        <p class="jp-line"><span class="kanji">${p.jp}</span>${p.romaji} · “${p.mean}”</p>
+        <p class="desc">${p.desc}</p>
+      </div>
+      <div class="move">
+        ${moveGrid(p.move)}
+        <span class="mlab">Movimento</span>
+      </div>
+    </div>`).join('');
+
+  /* ---------------- render promos ---------------- */
+  const pl = document.getElementById('promoList');
+  pl.innerHTML = PROMOS.map(p=>`
+    <div class="prow">
+      <div class="pside">
+        <div class="stage"><svg viewBox="0 0 90 100" class="black-piece"><use href="#${p.base}"/></svg></div>
+        <div class="txt"><h4>${p.baseName}</h4><div class="sub"><span class="kanji">${p.bjp}</span></div></div>
+      </div>
+      <div class="arrow">
+        <svg viewBox="0 0 30 14"><line x1="2" y1="7" x2="24" y2="7" stroke="currentColor" stroke-width="1.6"/><path d="M24,2 L29,7 L24,12 Z" fill="currentColor"/></svg>
+        <span class="tag">promove</span>
+      </div>
+      <div class="pside is-promo">
+        <div class="stage"><svg viewBox="0 0 90 100" class="white-piece"><use href="#${p.sym}"/></svg></div>
+        <div class="txt"><h4>${p.name}</h4><div class="sub"><span class="kanji">${p.jp}</span></div><div class="nm">${p.nm}</div></div>
+      </div>
+      <div class="move">${moveGrid(p.move)}<span class="mlab">Novo mov.</span></div>
+    </div>`).join('');
+</script>
+</body>
+</html>

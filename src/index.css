@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #2c2620;
+  --panel: #3a332b;
+  --panel2: #473e34;
+  --ink: #f3ead9;
+  --muted: #b6a98f;
+  --line: #5a4f41;
+  --wood: #e4c891;
+  --wood-l: #efdcb4;
+  --wood-d: #d8b87f;
+  --accent: #3f8f6b;
+  --accent2: #c2603f;
+  --warn: #d2553f;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: radial-gradient(120% 120% at 50% 0%, #342d25 0%, #241f1a 100%);
+  color: var(--ink);
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── piece colour inheritance (keep fill/stroke/color — not CSS vars) ── */
+.set-cls.own-light { fill: url(#fillL); stroke: #2c2820; color: #2c2820; }
+.set-cls.own-dark  { fill: url(#fillD); stroke: #1a1712; color: #f1ead9; }
+.set-cls .cbody    { stroke-width: 3.4; stroke-linejoin: round; stroke-linecap: round; paint-order: stroke; }
+.set-cls .det      { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .72; }
+.set-cls .eye      { fill: none; stroke-width: 2.6; }
+.set-cls .mark     { fill: currentColor; stroke: none; }
+
+.set-min.own-light { fill: #f4efe6; stroke: #23211c; color: #23211c; }
+.set-min.own-dark  { fill: #26231f; stroke: #0f0e0b; color: #efe9dc; }
+.set-min .body     { stroke-width: 1.6; stroke-linejoin: round; }
+.set-min .mark     { fill: currentColor; stroke: none; }
+.set-min .cut      { fill: currentColor; stroke: none; }
+
+/* ── samsonadzes piece set ── pre-colored SVG images, no CSS fill needed ── */
+.set-sam.own-light { }
+.set-sam.own-dark  { }
+
+/* ── flat set — same Staunton shapes as cls, flat fill, no interior lines ── */
+.set-flt.own-light { fill: #f2ead4; stroke: #18140e; color: #18140e; }
+.set-flt.own-dark  { fill: #1e1a14; stroke: #18140e; color: #d4c8a4; }
+.set-flt .fbody    { stroke-width: 3.2; stroke-linejoin: round; stroke-linecap: round; paint-order: stroke; }
+.set-flt .fmark    { fill: currentColor; stroke: none; }
+
+/* ── neo set — cartoon/rounded, thick stroke, soft gradient ── */
+.set-neo.own-light { fill: url(#neoL); stroke: #1e1c18; color: #1e1c18; }
+.set-neo.own-dark  { fill: url(#neoD); stroke: #1a1816; color: #d2cabb; }
+.set-neo .nbody    { stroke-width: 4.5; stroke-linejoin: round; stroke-linecap: round; paint-order: stroke; }
+.set-neo .nmark    { fill: currentColor; stroke: none; }
+
+/* ── gothic set — Staunton shapes + diamond lattice ornament ── */
+.set-got.own-light { fill: #ede5cc; stroke: #1a1610; color: #1a1610; }
+.set-got.own-dark  { fill: #1a1610; stroke: #ede5cc; color: #ede5cc; }
+.set-got .gbody    { stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; paint-order: stroke; }
+.set-got .gmark    { fill: currentColor; stroke: none; }
+.set-got .gdiam    { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.4; }
+
+/* ── máscaras set — Commedia dell'Arte P&B; figurino em currentColor ── */
+.set-msk.own-light { fill: #f0ece2; stroke: #1a1614; color: #1a1614; }
+.set-msk.own-dark  { fill: #1a1614; stroke: #e0d8cc; color: #e0d8cc; }
+
+/* ── geo piece set — geometric inner frame + shape marks ── */
+.set-geo.own-light { fill: #e8dcc8; stroke: #2a2016; color: #2a2016; }
+.set-geo.own-dark  { fill: #1c1814; stroke: #c8b890; color: #c8b890; }
+
+/* ── kanji piece set ──
+   fill/stroke/color on the outer <svg> so they cascade into the <use> shadow tree.
+   The ellipse's fill="url(#dropsh)" presentation attribute beats inherited fill.
+   Text uses fill:currentColor so it picks up the `color` property per ownership.   */
+.set-kan.own-light { fill: #f4ede0; stroke: #2c2820; color: #2c2820; }
+.set-kan.own-dark  { fill: #2a2420; stroke: #110e0b; color: #ede4d0; }
+
+/* ── board frame — positioned for labels; sized to viewport height on desktop ── */
+.board-frame {
+  position: relative;
+}
+
+@media (min-width: 64rem) {
+  .board-frame {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    max-width: 680px;
+    max-height: 680px;
+  }
+}
+
+/* ── game grid: board col + history col (desktop) ── */
+.game-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 680px);
+  justify-content: center;
+}
+
+/* gcol-main: hand + board cells — col 1 on mobile, col 2 on desktop */
+.gcol-main { grid-column: 1; }
+
+@media (min-width: 64rem) {
+  .game-grid {
+    grid-template-columns: 56px minmax(0, 680px) 180px;
+    grid-template-rows: auto 1fr auto;
+    height: calc(100dvh - 28px);
+    align-items: stretch;
+    justify-content: center;
+  }
+  .gcol-main  { grid-column: 2; }
+  .board-frame { margin: 0 auto; }
+}

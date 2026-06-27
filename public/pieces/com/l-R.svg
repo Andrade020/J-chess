@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 104" width="90" height="104" style="--skin:#f0d9b8;--skinSh:#ece4d2">
+  <g stroke="#2a201a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" style="paint-order:stroke">
+    <ellipse cx="45" cy="99" rx="24" ry="3.6" fill="rgba(0,0,0,.16)" stroke="none"></ellipse>
+    <rect x="40.5" y="62" width="9" height="22" rx="2" style="fill:var(--skin)" stroke-width="2.6"></rect>
+    <path d="M24,86 Q28,75 33,84 Q37,75 41,84 Q45,76 49,84 Q53,75 57,84 Q62,75 66,86 Q56,94 45,95 Q34,94 24,86 Z" style="fill:var(--skinSh)" stroke-width="2.6"></path>
+      <path d="M55,22 C63,14 70,14 73,9 C69,18 69,22 60,27 Z" fill="#c0322e" stroke-width="2.4"></path>
+      <path d="M22,34 Q45,28 68,34 Q45,40 22,34 Z" fill="#2e3a5a" stroke-width="3"></path>
+      <path d="M32,34 C32,22 58,22 58,34 Z" fill="#2e3a5a" stroke-width="3"></path>
+      <path style="fill:var(--skin)" d="M33,40 C33,34 57,34 57,40 C57,52 51,62 45,64 C39,62 33,52 33,40 Z" stroke-width="3"></path>
+      <path d="M33,42 C33,37 57,37 57,42 C57,46 54,48 51,48 L50,53 C49,50 47,50 45,53 L43,53 C41,50 41,48 39,48 C36,48 33,46 33,42 Z" fill="#8a5a32" stroke-width="2.4"></path>
+      <circle cx="40" cy="44" r="2.8" fill="#fbf7ee" stroke-width="1.6"></circle>
+      <circle cx="50" cy="44" r="2.8" fill="#fbf7ee" stroke-width="1.6"></circle>
+      <circle cx="40" cy="44.5" r="1.3" fill="#2a201a" stroke="none"></circle>
+      <circle cx="50" cy="44.5" r="1.3" fill="#2a201a" stroke="none"></circle>
+      <path d="M34,55 Q40,52 45,54 Q50,52 56,55 Q51,49 45,52 Q39,49 34,55 Z" fill="#3a2a1a" stroke-width="2.2"></path>
+      <path d="M34,55 q-4,-4 -7,-2 M56,55 q4,-4 7,-2" fill="none" stroke-width="2"></path>
+  </g>
+</svg>
