@@ -45,6 +45,7 @@ export default function Home() {
   const [myLobbyId, setMyLobbyId] = useState<string | null>(null)
   const [selectedTc, setSelectedTc] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [lobbyErr, setLobbyErr] = useState<string | null>(null)
   const [incoming, setIncoming] = useState<IncomingChallenge[]>([])
   const [searchUser, setSearchUser] = useState(searchParams.get('challenge') ?? '')
   const [searchResult, setSearchResult] = useState<{ id: string; username: string; rating: number } | null>(null)
@@ -57,10 +58,12 @@ export default function Home() {
     supabase
       .from('lobby')
       .select('*, profiles(username, rating)')
-      .is('game_id', null)
       .gt('created_at', new Date(Date.now() - 10 * 60_000).toISOString())
       .order('created_at', { ascending: false })
-      .then(({ data }) => setLobby((data ?? []) as LobbyEntry[]))
+      .then(({ data, error }) => {
+        if (error) console.error('lobby load:', error.message)
+        else setLobby((data ?? []) as LobbyEntry[])
+      })
   }, [])
 
   /* ── realtime: lobby table ── */
@@ -120,15 +123,17 @@ export default function Home() {
 
   /* ── create lobby challenge ── */
   async function createChallenge() {
-    if (!profile) return
+    if (!profile) { setLobbyErr('Perfil não encontrado. Tente recarregar a página.'); return }
     setBusy(true)
+    setLobbyErr(null)
     const tc = TC_OPTIONS[selectedTc]
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('lobby')
       .insert({ user_id: profile.id, time_control_secs: tc.secs, time_control_inc: tc.inc })
-      .select()
+      .select('id')
       .single()
-    if (data) setMyLobbyId((data as { id: string }).id)
+    if (error) setLobbyErr(error.message)
+    else if (data) setMyLobbyId((data as { id: string }).id)
     setBusy(false)
   }
 
@@ -262,6 +267,11 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {lobbyErr && (
+              <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--warn)', marginBottom: '8px', wordBreak: 'break-word' }}>
+                {lobbyErr}
+              </div>
+            )}
             {myLobbyId ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '11px', color: 'var(--muted)', textAlign: 'center' }}>

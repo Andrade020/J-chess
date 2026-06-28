@@ -564,12 +564,16 @@ export default function Game() {
   async function createOnlineChallenge() {
     if (!profile) return
     const tc = TIME_CONTROLS[selectedTc]
-    const { data } = await supabase.from('lobby').insert({
+    const { data, error } = await supabase.from('lobby').insert({
       user_id: profile.id,
       time_control_secs: tc.secs > 0 ? tc.secs : null,
       time_control_inc: tc.inc,
-    }).select().single()
-    if (data) setOnlineWaitId((data as { id: string }).id)
+    }).select('id').single()
+    if (error) {
+      alert(`Erro ao criar desafio: ${error.message}`)
+    } else if (data) {
+      setOnlineWaitId((data as { id: string }).id)
+    }
   }
 
   async function cancelOnlineChallenge() {
