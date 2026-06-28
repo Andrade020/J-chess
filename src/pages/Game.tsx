@@ -14,6 +14,7 @@ import {
 import { coord } from '../lib/pieces'
 import { loadGame, loadSettings, saveGame, saveSettings } from '../lib/storage'
 import { useAuth } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 import { sounds } from '../lib/sounds'
 import { detectOpening } from '../lib/openings'
 
@@ -277,6 +278,8 @@ export default function Game() {
   const [showSettings, setShowSettings] = useState(false)
   const [showNewGame, setShowNewGame] = useState(false)
   const [selectedTc, setSelectedTc] = useState(0)
+  const [newGameMode, setNewGameMode] = useState<'ai' | 'local' | 'online'>('ai')
+  const [onlineWaitId, setOnlineWaitId] = useState<string | null>(null)
   const [clockCfg, setClockCfg] = useState<{ secs: number; inc: number } | null>(
     () => loadGame()?.clockCfg ?? null
   )
@@ -330,6 +333,24 @@ export default function Game() {
     aiSearching.current = true
     workerRef.current.postMessage({ type: 'SEARCH', state, depth: 5, timeMs: 2000 })
   }, [isAiMode, state, status.over, pendingPromo]) // eslint-disable-line
+
+  /* lobby realtime: quando oponente aceita desafio online, navegar para a partida */
+  useEffect(() => {
+    if (!onlineWaitId) return
+    const ch = supabase.channel(`lobby-wait-${onlineWaitId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobby', filter: `id=eq.${onlineWaitId}` },
+        (payload) => {
+          const gameId = (payload.new as { game_id: string | null }).game_id
+          if (gameId) {
+            supabase.from('lobby').delete().eq('id', onlineWaitId)
+            setOnlineWaitId(null)
+            setShowNewGame(false)
+            navigate(`/game/${gameId}`)
+          }
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [onlineWaitId, navigate])
 
   const [drag, setDrag] = useState<
     | { kind: 'board'; origin: { r: number; c: number }; cell: Cell; cellSizePx: number }
@@ -538,6 +559,22 @@ export default function Game() {
     setClocks({ l: tc.secs, d: tc.secs })
     prevHistLen.current = 0
     setShowNewGame(false)
+  }
+
+  async function createOnlineChallenge() {
+    if (!profile) return
+    const tc = TIME_CONTROLS[selectedTc]
+    const { data } = await supabase.from('lobby').insert({
+      user_id: profile.id,
+      time_control_secs: tc.secs > 0 ? tc.secs : null,
+      time_control_inc: tc.inc,
+    }).select().single()
+    if (data) setOnlineWaitId((data as { id: string }).id)
+  }
+
+  async function cancelOnlineChallenge() {
+    if (onlineWaitId) await supabase.from('lobby').delete().eq('id', onlineWaitId)
+    setOnlineWaitId(null)
   }
 
   function resolvePromo(promote: boolean) {
@@ -888,17 +925,43 @@ export default function Game() {
       {showNewGame && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,10,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-          onClick={e => { if (e.target === e.currentTarget) setShowNewGame(false) }}
+          onClick={e => { if (e.target === e.currentTarget && !onlineWaitId) setShowNewGame(false) }}
         >
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '18px', padding: '22px 24px', width: 'min(92vw,360px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '18px', padding: '22px 24px', width: 'min(92vw,380px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: '"Space Grotesk",sans-serif', fontWeight: 700, fontSize: '16px' }}>Novo jogo</span>
-              <button onClick={() => setShowNewGame(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '2px 6px' }}>×</button>
+              {!onlineWaitId && (
+                <button onClick={() => setShowNewGame(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '2px 6px' }}>×</button>
+              )}
+            </div>
+
+            {/* mode selector */}
+            <div>
+              <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '9px', letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '8px' }}>Modo</div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {([
+                  { key: 'ai',     label: 'vs IA' },
+                  { key: 'local',  label: 'vs Humano' },
+                  { key: 'online', label: 'Online' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { if (!onlineWaitId) setNewGameMode(key) }}
+                    style={{
+                      flex: 1, fontFamily: '"Space Grotesk",sans-serif', fontSize: '12px', fontWeight: 600,
+                      background: newGameMode === key ? 'var(--accent)' : 'var(--panel2)',
+                      color: newGameMode === key ? '#0f1a14' : 'var(--ink)',
+                      border: `1px solid ${newGameMode === key ? 'var(--accent)' : 'var(--line)'}`,
+                      borderRadius: '9px', padding: '8px 4px', cursor: onlineWaitId ? 'default' : 'pointer',
+                    }}
+                  >{label}</button>
+                ))}
+              </div>
             </div>
 
             {/* time control picker */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* "Sem tempo" */}
               <button
                 onClick={() => setSelectedTc(0)}
                 style={{
@@ -907,6 +970,7 @@ export default function Game() {
                   color: selectedTc === 0 ? '#0f1a14' : 'var(--ink)',
                   border: `1px solid ${selectedTc === 0 ? 'var(--accent)' : 'var(--line)'}`,
                   borderRadius: '10px', padding: '9px 14px', cursor: 'pointer', textAlign: 'left',
+                  opacity: onlineWaitId ? .5 : 1,
                 }}
               >
                 ∞ Sem tempo
@@ -921,13 +985,14 @@ export default function Game() {
                       {items.map(({ label, i }) => (
                         <button
                           key={i}
-                          onClick={() => setSelectedTc(i)}
+                          onClick={() => { if (!onlineWaitId) setSelectedTc(i) }}
                           style={{
                             fontFamily: '"Space Grotesk",sans-serif', fontSize: '12px', fontWeight: 600,
                             background: selectedTc === i ? 'var(--accent)' : 'var(--panel2)',
                             color: selectedTc === i ? '#0f1a14' : 'var(--ink)',
                             border: `1px solid ${selectedTc === i ? 'var(--accent)' : 'var(--line)'}`,
-                            borderRadius: '9px', padding: '7px 12px', cursor: 'pointer',
+                            borderRadius: '9px', padding: '7px 12px', cursor: onlineWaitId ? 'default' : 'pointer',
+                            opacity: onlineWaitId ? .5 : 1,
                           }}
                         >{label}</button>
                       ))}
@@ -937,16 +1002,58 @@ export default function Game() {
               })}
             </div>
 
-            <button
-              onClick={startNewGame}
-              style={{
-                fontFamily: '"Space Mono",monospace', background: 'var(--accent)', color: '#0f1a14',
-                border: 'none', borderRadius: '10px', padding: '12px 0', fontSize: '13px', fontWeight: 700,
-                cursor: 'pointer', width: '100%', marginTop: '2px',
-              }}
-            >
-              Iniciar
-            </button>
+            {/* action area */}
+            {newGameMode !== 'online' ? (
+              <button
+                onClick={() => {
+                  if (newGameMode === 'ai') {
+                    navigate('/play')
+                    startNewGame()
+                  } else {
+                    navigate('/play?mode=local')
+                    startNewGame()
+                  }
+                }}
+                style={{
+                  fontFamily: '"Space Mono",monospace', background: 'var(--accent)', color: '#0f1a14',
+                  border: 'none', borderRadius: '10px', padding: '12px 0', fontSize: '13px', fontWeight: 700,
+                  cursor: 'pointer', width: '100%',
+                }}
+              >
+                Iniciar
+              </button>
+            ) : onlineWaitId ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+                <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)' }}>
+                  Aguardando oponente...
+                </div>
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <button
+                    onClick={() => navigate('/')}
+                    style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '12px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)', borderRadius: '10px', padding: '10px', cursor: 'pointer' }}
+                  >
+                    Ver lobby
+                  </button>
+                  <button
+                    onClick={() => { cancelOnlineChallenge(); setShowNewGame(false) }}
+                    style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '12px', background: 'var(--panel2)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: '10px', padding: '10px', cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={createOnlineChallenge}
+                style={{
+                  fontFamily: '"Space Mono",monospace', background: 'var(--accent)', color: '#0f1a14',
+                  border: 'none', borderRadius: '10px', padding: '12px 0', fontSize: '13px', fontWeight: 700,
+                  cursor: 'pointer', width: '100%',
+                }}
+              >
+                Criar desafio online
+              </button>
+            )}
           </div>
         </div>
       )}
