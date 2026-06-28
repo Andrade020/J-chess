@@ -25,11 +25,12 @@ interface AuthCtx {
 const AuthContext = createContext<AuthCtx | null>(null)
 
 async function fetchProfile(userId: string, user?: User): Promise<Profile | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
+  if (error) console.error('[auth] fetchProfile error:', error.code, error.message, { userId })
   if (data) return data as Profile
 
   /* fallback: trigger falhou → cria perfil manualmente */

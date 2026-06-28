@@ -159,12 +159,13 @@ export default function Home() {
   async function handleSearch() {
     if (!searchUser.trim()) return
     setSearchMsg(null)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id, username, rating')
       .eq('username', searchUser.trim())
-      .single()
-    if (!data) { setSearchMsg('Usuário não encontrado.'); setSearchResult(null); return }
+      .maybeSingle()
+    if (error) console.error('[search] error:', error.code, error.message)
+    if (!data) { setSearchMsg(`Usuário não encontrado. (buscado: "${searchUser.trim()}")`); setSearchResult(null); return }
     if (data.id === user?.id) { setSearchMsg('Esse é você!'); setSearchResult(null); return }
     setSearchResult(data as { id: string; username: string; rating: number })
     setSearchMsg(null)
@@ -204,6 +205,9 @@ export default function Home() {
 
   /* ── render ── */
   const others = lobby.filter(e => e.user_id !== user?.id)
+
+  /* debug info — remove after fix */
+  console.log('[home] user:', user?.id, '| profile:', profile?.username ?? null)
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
