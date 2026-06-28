@@ -11,6 +11,7 @@ import {
 } from '../lib/engine'
 import { coord, pieceClasses, symId } from '../lib/pieces'
 import { loadGame, loadSettings, saveGame, saveSettings } from '../lib/storage'
+import { useAuth } from '../lib/auth'
 import { sounds } from '../lib/sounds'
 import { detectOpening } from '../lib/openings'
 
@@ -287,6 +288,7 @@ function initialState(): GameUiState {
 export default function Game() {
   const [ui, dispatch] = useReducer(reducer, undefined, initialState)
   const { state, history, notation, lastMove, sel, settings, pendingPromo } = ui
+  const { profile, signOut } = useAuth()
   const status = gameStatus(state)
   const opening = detectOpening(state, notation.length)
   const theme = THEMES[settings.theme]
@@ -669,14 +671,30 @@ export default function Game() {
           >⚙ Config</button>
         </div>
         <div style={{ flex: 1 }} />
-        <a
-          href="https://andrade020.github.io/"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', letterSpacing: '.04em', color: 'var(--muted)', opacity: .38, textDecoration: 'none', lineHeight: 1.5 }}
-        >
-          lucas andrade
-        </a>
+
+        {/* user info */}
+        {profile && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '11px', fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {profile.username}
+              </span>
+              <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)' }}>
+                {profile.is_guest ? 'convidado' : `⭐ ${profile.rating}`}
+              </span>
+            </div>
+            <button
+              onClick={signOut}
+              style={{
+                fontFamily: '"Space Mono",monospace', fontSize: '10px', letterSpacing: '.02em',
+                background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)',
+                borderRadius: '8px', padding: '5px 8px', cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              ⇥ Sair
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* ── game area ── */}
