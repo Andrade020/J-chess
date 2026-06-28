@@ -1,7 +1,10 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import AuthModal from './components/AuthModal'
 import Game from './pages/Game'
+import Home from './pages/Home'
+import OnlineGame from './pages/OnlineGame'
+import Profile from './pages/Profile'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -21,8 +24,11 @@ function AppRoutes() {
     <>
       {!user && <AuthModal />}
       <Routes>
-        <Route path="/" element={<Game />} />
-        <Route path="*" element={<Game />} />
+        <Route path="/"                    element={<Home />} />
+        <Route path="/play"                element={<Game />} />
+        <Route path="/game/:id"            element={<OnlineGame />} />
+        <Route path="/profile/:username"   element={<Profile />} />
+        <Route path="*"                    element={<Navigate to="/" replace />} />
       </Routes>
     </>
   )

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import PieceDefs from '../components/PieceDefs'
+import PieceSVG from '../components/PieceSVG'
 import type {
   BoardTheme, Cell, GameState, HandType, HistoryEntry,
   Owner, PieceSet, SelectionKind, Settings, Target,
@@ -9,7 +11,7 @@ import {
   apply, canPromote, gameStatus, HAND_TYPES, kingPos,
   legalDrops, legalTargetsFrom, mustPromote, newGame,
 } from '../lib/engine'
-import { coord, pieceClasses, symId } from '../lib/pieces'
+import { coord } from '../lib/pieces'
 import { loadGame, loadSettings, saveGame, saveSettings } from '../lib/storage'
 import { useAuth } from '../lib/auth'
 import { sounds } from '../lib/sounds'
@@ -134,26 +136,6 @@ function PlayerPanel({ side, secs, active, hasClock, matLead }: {
         </span>
       )}
     </div>
-  )
-}
-
-function PieceSVG({ cell, set, fill, size, noFlip }: { cell: Cell; set: PieceSet; fill?: boolean; size?: string; noFlip?: boolean }) {
-  const flip = (!noFlip && (set === 'kan' || set === 'geo') && cell.o === 'd') ? { transform: 'rotate(180deg)' } : {}
-  if (set === 'sam' || set === 'oli' || set === 'com') {
-    const suffix = (cell.p && cell.t !== 'K' && cell.t !== 'G') ? '-p' : ''
-    const src = `/pieces/${set}/${cell.o}-${cell.t}${suffix}.svg`
-    const style: CSSProperties = fill
-      ? { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', pointerEvents: 'none', objectFit: 'contain', filter: 'drop-shadow(0 1.5px 2.5px rgba(30,18,4,.35))', ...flip }
-      : { width: size, height: size, display: 'block', pointerEvents: 'none', objectFit: 'contain', ...flip }
-    return <img src={src} style={style} alt="" draggable={false} />
-  }
-  const style: CSSProperties = fill
-    ? { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', pointerEvents: 'none', filter: 'drop-shadow(0 1.5px 2.5px rgba(30,18,4,.35))', ...flip }
-    : { width: size, height: size, display: 'block', pointerEvents: 'none', ...flip }
-  return (
-    <svg className={`pc ${pieceClasses(cell, set)}`} viewBox="0 0 100 100" style={style}>
-      <use href={`#${symId(cell, set)}`} x="0" y="0" width="100" height="100" />
-    </svg>
   )
 }
 
@@ -313,6 +295,41 @@ export default function Game() {
   const stateRef = useRef(state); stateRef.current = state
   const statusRef = useRef(status); statusRef.current = status
   const pendingPromoRef = useRef(pendingPromo); pendingPromoRef.current = pendingPromo
+
+  /* ── AI mode ── */
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isAiMode = searchParams.get('mode') !== 'local'
+  const workerRef = useRef<Worker | null>(null)
+  const aiSearching = useRef(false)
+
+  useEffect(() => {
+    if (!isAiMode) return
+    const w = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' })
+    w.onmessage = (e: MessageEvent) => {
+      aiSearching.current = false
+      const { move } = e.data
+      if (!move) return
+      if ('drop' in move) {
+        dispatch({ type: 'DROP', htype: move.drop, r: move.to.r, c: move.to.c })
+      } else {
+        const s = stateRef.current
+        const cell = s.board[move.from.r][move.from.c]
+        if (!cell) return
+        const cap = !!s.board[move.to.r][move.to.c]
+        dispatch({ type: 'MOVE', fr: move.from.r, fc: move.from.c, tr: move.to.r, tc: move.to.c, promote: move.promote, cap, cell })
+      }
+    }
+    workerRef.current = w
+    return () => { w.terminate(); workerRef.current = null }
+  }, [isAiMode]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!isAiMode || status.over || state.turn !== 'd' || pendingPromo || aiSearching.current) return
+    if (!workerRef.current) return
+    aiSearching.current = true
+    workerRef.current.postMessage({ type: 'SEARCH', state, depth: 5, timeMs: 2000 })
+  }, [isAiMode, state, status.over, pendingPromo]) // eslint-disable-line
 
   const [drag, setDrag] = useState<
     | { kind: 'board'; origin: { r: number; c: number }; cell: Cell; cellSizePx: number }
@@ -695,6 +712,16 @@ export default function Game() {
             </button>
           </div>
         )}
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            fontFamily: '"Space Mono",monospace', fontSize: '10px', letterSpacing: '.02em',
+            background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)',
+            borderRadius: '8px', padding: '5px 8px', cursor: 'pointer', textAlign: 'left', width: '100%',
+          }}
+        >
+          ← Lobby
+        </button>
       </aside>
 
       {/* ── game area ── */}
