@@ -4,9 +4,14 @@
 -- ============================================================
 
 /* 1. Permite que o próprio usuário crie seu perfil (fallback ao trigger) */
-create policy if not exists "profiles_insert"
-  on public.profiles for insert
-  with check (auth.uid() = id);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_insert'
+  ) then
+    execute 'create policy "profiles_insert" on public.profiles for insert with check (auth.uid() = id)';
+  end if;
+end $$;
 
 /* 2. Trigger atualizado: usa ON CONFLICT para não quebrar em username duplicado */
 create or replace function public.handle_new_user()
