@@ -378,6 +378,8 @@ export default function Game() {
     if (!drag) return
 
     function onMove(e: PointerEvent) {
+      const d = drag
+      if (!d) return
       const el = dragFloatEl.current
       if (!el) return
       if (!dragActive.current && dragInitialPos.current) {
@@ -386,9 +388,8 @@ export default function Game() {
         if (Math.hypot(dx, dy) > 4) {
           dragActive.current = true
           el.style.display = 'block'
-          // Para drag de mão: só agora mostra os alvos no tabuleiro
-          if (drag.kind === 'hand') {
-            dispatch({ type: 'SELECT_HAND', owner: drag.owner, htype: drag.htype, targets: legalDrops(stateRef.current, drag.htype) })
+          if (d.kind === 'hand') {
+            dispatch({ type: 'SELECT_HAND', owner: d.owner, htype: d.htype, targets: legalDrops(stateRef.current, d.htype) })
           }
         }
       }
@@ -399,7 +400,9 @@ export default function Game() {
     }
 
     function onUp(e: PointerEvent) {
-      const wasHandDrag = drag.kind === 'hand'
+      const d = drag
+      if (!d) return
+      const wasHandDrag = d.kind === 'hand'
       const wasActive   = dragActive.current
       setDrag(null)
       dragActive.current = false
@@ -1232,7 +1235,7 @@ function MoveHistoryItems({ entries, set }: { entries: HistoryEntry[]; set: Piec
 function MoveHistory({ entries, set, elRef, maxH }: {
   entries: HistoryEntry[]
   set: PieceSet
-  elRef: React.RefObject<HTMLDivElement | null>
+  elRef: React.Ref<HTMLDivElement>
   maxH?: string
 }) {
   return (
