@@ -144,6 +144,28 @@ create policy "challenges_insert"
 create policy "challenges_update"
   on public.challenges for update using (auth.uid() = to_id);
 
+-- ── Grants ────────────────────────────────────────────────────
+-- Sem estes grants os roles recebem 403 mesmo com políticas RLS corretas
+grant usage on schema public to anon, authenticated;
+
+grant select on public.profiles to anon, authenticated;
+grant insert on public.profiles to authenticated;
+grant update on public.profiles to authenticated;
+
+grant select on public.games to anon, authenticated;
+grant insert on public.games to authenticated;
+grant update on public.games to authenticated;
+
+grant select on public.lobby to anon, authenticated;
+grant insert on public.lobby to authenticated;
+grant update on public.lobby to authenticated;
+grant delete on public.lobby to authenticated;
+
+grant select on public.challenges to authenticated;
+grant insert on public.challenges to authenticated;
+grant update on public.challenges to authenticated;
+grant delete on public.challenges to authenticated;
+
 -- ── Realtime ─────────────────────────────────────────────────
 -- Habilita mudanças em tempo real nas tabelas relevantes
 alter publication supabase_realtime add table public.games;
