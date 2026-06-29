@@ -22,6 +22,13 @@ interface IncomingChallenge {
   profiles: { username: string; rating: number }
 }
 
+interface ActiveGame {
+  id: string
+  opponentName: string
+  time_control_secs: number | null
+  time_control_inc: number | null
+}
+
 const TC_OPTIONS = [
   { label: 'Sem tempo', secs: null, inc: 0 },
   { label: '3 min',   secs: 180,  inc: 0 },
@@ -30,7 +37,7 @@ const TC_OPTIONS = [
   { label: '15+10',   secs: 900,  inc: 10 },
 ]
 
-function tcLabel(secs: number | null, inc: number) {
+function tcLabel(secs: number | null, inc: number | null) {
   if (!secs) return 'Sem tempo'
   const m = Math.floor(secs / 60)
   return inc ? `${m}+${inc}` : `${m} min`
@@ -41,19 +48,23 @@ export default function Home() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const [lobby, setLobby] = useState<LobbyEntry[]>([])
-  const [myLobbyId, setMyLobbyId] = useState<string | null>(null)
-  const [selectedTc, setSelectedTc] = useState(0)
-  const [busy, setBusy] = useState(false)
-  const [lobbyErr, setLobbyErr] = useState<string | null>(null)
-  const [incoming, setIncoming] = useState<IncomingChallenge[]>([])
-  const [searchUser, setSearchUser] = useState(searchParams.get('challenge') ?? '')
+  const [lobby, setLobby]               = useState<LobbyEntry[]>([])
+  const [myLobbyId, setMyLobbyId]       = useState<string | null>(null)
+  const [selectedTc, setSelectedTc]     = useState(0)
+  const [busy, setBusy]                 = useState(false)
+  const [lobbyErr, setLobbyErr]         = useState<string | null>(null)
+  const [incoming, setIncoming]         = useState<IncomingChallenge[]>([])
+  const [searchUser, setSearchUser]     = useState(searchParams.get('challenge') ?? '')
   const [searchResult, setSearchResult] = useState<{ id: string; username: string; rating: number } | null>(null)
-  const [searchMsg, setSearchMsg] = useState<string | null>(null)
+  const [searchMsg, setSearchMsg]       = useState<string | null>(null)
+  const [pendingChalId, setPendingChalId]   = useState<string | null>(null)
+  const [pendingChalTo, setPendingChalTo]   = useState<string | null>(null)
+  const [activeGames, setActiveGames]   = useState<ActiveGame[]>([])
+
   const myLobbyRef = useRef<string | null>(null)
   myLobbyRef.current = myLobbyId
 
-  /* ── load lobby entries ── */
+  /* ── load lobby ── */
   useEffect(() => {
     supabase
       .from('lobby')
@@ -65,6 +76,28 @@ export default function Home() {
         else setLobby((data ?? []) as LobbyEntry[])
       })
   }, [])
+
+  /* ── load active games ── */
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('games')
+      .select('id, light_id, dark_id, time_control_secs, time_control_inc, light_profile:profiles!games_light_id_fkey(username), dark_profile:profiles!games_dark_id_fkey(username)')
+      .or(`light_id.eq.${user.id},dark_id.eq.${user.id}`)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (!data) return
+        setActiveGames(data.map((g: Record<string, unknown>) => ({
+          id: g.id as string,
+          opponentName: g.light_id === user.id
+            ? ((g.dark_profile  as { username: string } | null)?.username ?? 'Desconhecido')
+            : ((g.light_profile as { username: string } | null)?.username ?? 'Desconhecido'),
+          time_control_secs: g.time_control_secs as number | null,
+          time_control_inc:  g.time_control_inc  as number | null,
+        })))
+      })
+  }, [user])
 
   /* ── realtime: lobby table ── */
   useEffect(() => {
@@ -112,6 +145,27 @@ export default function Home() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user])
+
+  /* ── realtime: watch outgoing challenge for acceptance ── */
+  useEffect(() => {
+    if (!pendingChalId) return
+    const ch = supabase.channel(`chal-out-${pendingChalId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'challenges',
+        filter: `id=eq.${pendingChalId}`,
+      }, payload => {
+        const updated = payload.new as { status: string; game_id?: string }
+        if (updated.game_id) {
+          navigate(`/game/${updated.game_id}`)
+        } else if (updated.status === 'declined') {
+          setPendingChalId(null)
+          setPendingChalTo(null)
+          setSearchMsg('Desafio recusado.')
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [pendingChalId, navigate])
 
   /* cleanup: delete my lobby on unmount */
   useEffect(() => {
@@ -168,7 +222,7 @@ export default function Home() {
       .eq('username', searchUser.trim())
       .maybeSingle()
     if (error) console.error('[search] error:', error.code, error.message)
-    if (!data) { setSearchMsg(`Usuário não encontrado. (buscado: "${searchUser.trim()}")`); setSearchResult(null); return }
+    if (!data) { setSearchMsg(`Usuário não encontrado.`); setSearchResult(null); return }
     if (data.id === user?.id) { setSearchMsg('Esse é você!'); setSearchResult(null); return }
     setSearchResult(data as { id: string; username: string; rating: number })
     setSearchMsg(null)
@@ -178,15 +232,32 @@ export default function Home() {
     if (!searchResult || !profile) return
     setBusy(true)
     const tc = TC_OPTIONS[selectedTc]
-    await supabase.from('challenges').insert({
-      from_id: profile.id,
-      to_id: searchResult.id,
-      time_control_secs: tc.secs,
-      time_control_inc: tc.inc,
-    })
-    setSearchMsg(`Desafio enviado para ${searchResult.username}!`)
-    setSearchResult(null)
+    const { data, error } = await supabase
+      .from('challenges')
+      .insert({
+        from_id: profile.id,
+        to_id: searchResult.id,
+        time_control_secs: tc.secs,
+        time_control_inc: tc.inc,
+      })
+      .select('id')
+      .single()
+    if (!error && data) {
+      setPendingChalId((data as { id: string }).id)
+      setPendingChalTo(searchResult.username)
+      setSearchResult(null)
+      setSearchMsg(null)
+    } else {
+      setSearchMsg('Erro ao enviar desafio.')
+    }
     setBusy(false)
+  }
+
+  async function cancelPendingChallenge() {
+    if (!pendingChalId) return
+    await supabase.from('challenges').update({ status: 'declined' }).eq('id', pendingChalId)
+    setPendingChalId(null)
+    setPendingChalTo(null)
   }
 
   /* ── accept direct challenge ── */
@@ -209,9 +280,6 @@ export default function Home() {
 
   /* ── render ── */
   const others = lobby.filter(e => e.user_id !== user?.id)
-
-  /* debug info — remove after fix */
-  console.log('[home] user:', user?.id, '| profile:', profile?.username ?? null)
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -245,7 +313,7 @@ export default function Home() {
         {/* left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: '0 0 280px' }}>
 
-          {/* vs AI */}
+          {/* vs AI / local */}
           <section style={card}>
             <h2 style={cardTitle}>Jogar</h2>
             <button onClick={() => navigate('/play')} style={{ ...accentBtn, width: '100%', marginBottom: '8px' }}>
@@ -256,7 +324,7 @@ export default function Home() {
             </button>
           </section>
 
-          {/* create online challenge */}
+          {/* create open challenge */}
           <section style={card}>
             <h2 style={cardTitle}>Desafio Online</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
@@ -294,58 +362,97 @@ export default function Home() {
             )}
           </section>
 
-          {/* search / direct challenge */}
+          {/* direct challenge */}
           <section style={card}>
             <h2 style={cardTitle}>Desafiar usuário</h2>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-              <input
-                placeholder="username"
-                value={searchUser}
-                onChange={e => { setSearchUser(e.target.value); setSearchResult(null); setSearchMsg(null) }}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                style={inputStyle}
-              />
-              <button onClick={handleSearch} style={accentBtn}>→</button>
-            </div>
-            {searchMsg && <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)', fontFamily: '"Space Mono",monospace' }}>{searchMsg}</p>}
-            {searchResult && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 10px' }}>
-                <span style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '11px' }}>
-                  {searchResult.username} · ⭐{searchResult.rating}
-                </span>
-                <button onClick={sendDirectChallenge} disabled={busy} style={accentBtn}>Desafiar</button>
+            {pendingChalId ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '11px', color: 'var(--muted)', textAlign: 'center' }}>
+                  Aguardando <b style={{ color: 'var(--ink)' }}>{pendingChalTo}</b>...
+                </div>
+                <button onClick={cancelPendingChallenge} style={{ ...ghostBtn, width: '100%' }}>Cancelar desafio</button>
               </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                  <input
+                    placeholder="username"
+                    value={searchUser}
+                    onChange={e => { setSearchUser(e.target.value); setSearchResult(null); setSearchMsg(null) }}
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    style={inputStyle}
+                  />
+                  <button onClick={handleSearch} style={accentBtn}>→</button>
+                </div>
+                {searchMsg && <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)', fontFamily: '"Space Mono",monospace' }}>{searchMsg}</p>}
+                {searchResult && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 10px' }}>
+                    <span style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '11px' }}>
+                      {searchResult.username} · ⭐{searchResult.rating}
+                    </span>
+                    <button onClick={sendDirectChallenge} disabled={busy} style={accentBtn}>Desafiar</button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         </div>
 
-        {/* right column: lobby list */}
-        <div style={{ flex: 1, minWidth: '220px' }}>
-          <h2 style={{ ...cardTitle, marginBottom: '12px' }}>Desafios abertos</h2>
-          {others.length === 0 ? (
-            <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
-              Nenhum desafio aberto no momento.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {others.map(e => (
-                <div key={e.id} style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <button
-                    onClick={() => navigate(`/profile/${e.profiles?.username}`)}
-                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', flex: 1 }}
-                  >
-                    <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', fontWeight: 700 }}>{e.profiles?.username}</div>
-                    <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>
-                      ⭐{e.profiles?.rating} · {tcLabel(e.time_control_secs, e.time_control_inc)}
+        {/* right column */}
+        <div style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+          {/* active games */}
+          {activeGames.length > 0 && (
+            <div>
+              <h2 style={{ ...cardTitle, marginBottom: '12px' }}>Jogos em andamento</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {activeGames.map(g => (
+                  <div key={g.id} style={{ background: 'var(--panel)', border: '1px solid var(--accent)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', fontWeight: 700 }}>
+                        vs {g.opponentName}
+                      </div>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>
+                        {tcLabel(g.time_control_secs, g.time_control_inc)}
+                      </div>
                     </div>
-                  </button>
-                  <button onClick={() => acceptLobby(e.id)} disabled={busy} style={accentBtn}>
-                    Aceitar
-                  </button>
-                </div>
-              ))}
+                    <button onClick={() => navigate(`/game/${g.id}`)} style={accentBtn}>
+                      Continuar
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* open challenges */}
+          <div>
+            <h2 style={{ ...cardTitle, marginBottom: '12px' }}>Desafios abertos</h2>
+            {others.length === 0 ? (
+              <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
+                Nenhum desafio aberto no momento.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {others.map(e => (
+                  <div key={e.id} style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                      onClick={() => navigate(`/profile/${e.profiles?.username}`)}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', flex: 1 }}
+                    >
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', fontWeight: 700 }}>{e.profiles?.username}</div>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>
+                        ⭐{e.profiles?.rating} · {tcLabel(e.time_control_secs, e.time_control_inc)}
+                      </div>
+                    </button>
+                    <button onClick={() => acceptLobby(e.id)} disabled={busy} style={accentBtn}>
+                      Aceitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
