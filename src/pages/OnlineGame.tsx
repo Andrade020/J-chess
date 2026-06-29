@@ -63,6 +63,7 @@ export default function OnlineGame() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const gameRef = useRef<GameRow | null>(null)
   const stateRef = useRef<GameState | null>(null)
+  const timeoutClaimedRef = useRef(false)
   gameRef.current = game
   stateRef.current = state
 
@@ -111,22 +112,36 @@ export default function OnlineGame() {
     return () => { supabase.removeChannel(ch) }
   }, [id])
 
-  /* ── clock tick ── */
+  /* ── clock tick + timeout detection ── */
   useEffect(() => {
     const g = gameRef.current
     if (!g?.clock_light_ms || !g.last_move_at) return
+    timeoutClaimedRef.current = false  // reset when a new move comes in
     const tick = setInterval(() => {
-      const elapsed = Date.now() - new Date(g.last_move_at!).getTime()
+      const g2 = gameRef.current
       const cur = stateRef.current
-      if (!cur) return
+      if (!cur || !g2 || g2.status !== 'active') return
+
+      const elapsed = Date.now() - new Date(g.last_move_at!).getTime()
+      const lMs = Math.max(0, (g.clock_light_ms ?? 0) - elapsed)
+      const dMs = Math.max(0, (g.clock_dark_ms  ?? 0) - elapsed)
+
       if (cur.turn === 'l') {
-        setClockDisplay(c => ({ ...c, l: Math.max(0, (g.clock_light_ms ?? 0) - elapsed) }))
+        setClockDisplay(c => ({ ...c, l: lMs }))
+        if (lMs === 0 && !timeoutClaimedRef.current) {
+          timeoutClaimedRef.current = true
+          handleTimeout('d')
+        }
       } else {
-        setClockDisplay(c => ({ ...c, d: Math.max(0, (g.clock_dark_ms ?? 0) - elapsed) }))
+        setClockDisplay(c => ({ ...c, d: dMs }))
+        if (dMs === 0 && !timeoutClaimedRef.current) {
+          timeoutClaimedRef.current = true
+          handleTimeout('l')
+        }
       }
     }, 500)
     return () => clearInterval(tick)
-  }, [game?.id, game?.last_move_at, game?.state_json])
+  }, [game?.id, game?.last_move_at, game?.state_json]) // eslint-disable-line
 
   /* ── interaction ── */
   const isMyTurn = state && myColor && state.turn === myColor && game?.status !== 'finished'
@@ -241,7 +256,6 @@ export default function OnlineGame() {
       if (lm) setLastMove(lm)
       if (status.over) {
         sounds.gameOver()
-        triggerElo(game.id, status.winner ?? 'draw')
       } else if (inCheck(next, next.turn)) {
         sounds.check()
       } else {
@@ -251,15 +265,23 @@ export default function OnlineGame() {
     setSaving(false)
   }
 
-  async function triggerElo(gameId: string, winner: Owner | 'draw') {
-    await supabase.functions.invoke('update-ratings', { body: { game_id: gameId, winner } })
+  /* ELO é aplicado via trigger no banco (on_game_finished).
+     Não chamamos mais a Edge Function update-ratings. */
+
+  async function handleTimeout(winner: Owner) {
+    const g = gameRef.current
+    if (!g || g.status !== 'active') return
+    await supabase.rpc('claim_timeout', { p_game_id: g.id, p_winner: winner })
+    // O Realtime vai atualizar o estado local via subscription
+    sounds.gameOver()
   }
 
   async function resign() {
     if (!game || !myColor) return
     const winner = opp(myColor)
-    await supabase.from('games').update({ winner, win_reason: 'resign', status: 'finished' }).eq('id', game.id)
-    await triggerElo(game.id, winner)
+    await supabase.from('games')
+      .update({ winner, win_reason: 'resign', status: 'finished' })
+      .eq('id', game.id)
   }
 
   /* ── board render ── */
