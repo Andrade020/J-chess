@@ -96,6 +96,7 @@ export default function Home() {
     supabase
       .from('lobby')
       .select('*, profiles(username, rating)')
+      .is('game_id', null)
       .gt('created_at', new Date(Date.now() - 10 * 60_000).toISOString())
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
