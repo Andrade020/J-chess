@@ -81,6 +81,16 @@ export default function Home() {
   const myLobbyRef = useRef<string | null>(null)
   myLobbyRef.current = myLobbyId
 
+  /* ── revanche: pega desafio já enviado do OnlineGame ── */
+  useEffect(() => {
+    const pending = searchParams.get('pending')
+    const to      = searchParams.get('to')
+    if (pending && to) {
+      setPendingChalId(pending)
+      setPendingChalTo(decodeURIComponent(to))
+    }
+  }, []) // eslint-disable-line
+
   /* ── load lobby ── */
   useEffect(() => {
     supabase

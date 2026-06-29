@@ -284,6 +284,26 @@ export default function OnlineGame() {
       .eq('id', game.id)
   }
 
+  async function handleRevanche() {
+    if (!user || !game) return
+    const opponentId = myColor === 'l' ? game.dark_id : game.light_id
+    const { data, error } = await supabase
+      .from('challenges')
+      .insert({
+        from_id: user.id,
+        to_id: opponentId,
+        time_control_secs: game.time_control_secs,
+        time_control_inc: game.time_control_inc ?? 0,
+      })
+      .select('id')
+      .single()
+    if (!error && data) {
+      navigate(`/?pending=${(data as { id: string }).id}&to=${encodeURIComponent(opponentName ?? '')}`)
+    } else {
+      navigate('/')
+    }
+  }
+
   /* ── board render ── */
   if (errorMsg) return (
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
@@ -472,7 +492,7 @@ export default function OnlineGame() {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <button
-                          onClick={() => navigate(`/?challenge=${opponentName}`)}
+                          onClick={handleRevanche}
                           style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px', fontFamily: '"Space Mono",monospace', fontSize: '12px', cursor: 'pointer', fontWeight: 700 }}
                         >
                           Revanche
