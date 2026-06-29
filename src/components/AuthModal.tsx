@@ -5,12 +5,13 @@ type Tab = 'entrar' | 'cadastrar'
 
 export default function AuthModal() {
   const { signIn, signUp, signInAsGuest } = useAuth()
-  const [tab, setTab]         = useState<Tab>('entrar')
+  const [tab, setTab]           = useState<Tab>('entrar')
   const [username, setUsername] = useState('')
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]     = useState<string | null>(null)
-  const [busy, setBusy]       = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+  const [busy, setBusy]         = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,6 +21,7 @@ export default function AuthModal() {
       ? await signIn(email, password)
       : await signUp(email, password, username)
     if (err) setError(err)
+    else if (tab === 'cadastrar') setEmailSent(true)
     setBusy(false)
   }
 
@@ -75,59 +77,80 @@ export default function AuthModal() {
           ))}
         </div>
 
-        {/* form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {tab === 'cadastrar' && (
-            <input
-              placeholder="Nome de usuário"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-              minLength={3}
-              maxLength={20}
-              pattern="[a-zA-Z0-9_]+"
-              title="Apenas letras, números e _"
-              style={inputStyle}
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            minLength={6}
-            style={inputStyle}
-          />
-          {error && (
-            <p style={{ margin: 0, fontSize: '12px', color: 'var(--warn)', fontFamily: '"Hanken Grotesk",sans-serif' }}>
-              {error}
+        {/* email sent confirmation screen */}
+        {emailSent ? (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <div style={{ fontSize: '36px', marginBottom: '12px' }}>✉️</div>
+            <p style={{ margin: '0 0 8px', fontFamily: '"Space Grotesk",sans-serif', fontWeight: 600, fontSize: '15px' }}>
+              Confirme seu email
             </p>
-          )}
-          <button type="submit" disabled={busy} style={primaryBtn}>
-            {busy ? '...' : tab === 'entrar' ? 'Entrar' : 'Criar conta'}
-          </button>
-        </form>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--muted)', fontFamily: '"Hanken Grotesk",sans-serif', lineHeight: 1.5 }}>
+              Enviamos um link de confirmação para <strong>{email}</strong>. Clique nele para ativar sua conta.
+            </p>
+            <button
+              onClick={() => { setEmailSent(false); setTab('entrar') }}
+              style={ghostBtn}
+            >
+              Voltar para entrar
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* form */}
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {tab === 'cadastrar' && (
+                <input
+                  placeholder="Nome de usuário"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                  maxLength={20}
+                  pattern="[a-zA-Z0-9_]+"
+                  title="Apenas letras, números e _"
+                  style={inputStyle}
+                />
+              )}
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                style={inputStyle}
+              />
+              <input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                minLength={6}
+                style={inputStyle}
+              />
+              {error && (
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--warn)', fontFamily: '"Hanken Grotesk",sans-serif' }}>
+                  {error}
+                </p>
+              )}
+              <button type="submit" disabled={busy} style={primaryBtn}>
+                {busy ? '...' : tab === 'entrar' ? 'Entrar' : 'Criar conta'}
+              </button>
+            </form>
 
-        {/* divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-          <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: '"Space Mono",monospace' }}>ou</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-        </div>
+            {/* divider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
+              <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: '"Space Mono",monospace' }}>ou</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
+            </div>
 
-        {/* guest */}
-        <button onClick={handleGuest} disabled={busy} style={ghostBtn}>
-          Jogar como convidado
-        </button>
+            {/* guest */}
+            <button onClick={handleGuest} disabled={busy} style={ghostBtn}>
+              Jogar como convidado
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

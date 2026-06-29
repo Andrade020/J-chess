@@ -146,12 +146,15 @@ export default function Home() {
   /* ── accept lobby challenge ── */
   async function acceptLobby(entryId: string) {
     setBusy(true)
+    setLobbyErr(null)
     const initialState = newGame()
     const { data, error } = await supabase.rpc('accept_lobby_challenge', {
       p_lobby_id: entryId,
       p_initial_state: initialState as unknown as Record<string, unknown>,
     })
-    if (!error && data) navigate(`/game/${data}`)
+    if (error) { console.error('[acceptLobby]', error); setLobbyErr(`Erro ao aceitar: ${error.message}`) }
+    else if (data) navigate(`/game/${data}`)
+    else setLobbyErr('Desafio não retornou ID de partida.')
     setBusy(false)
   }
 
@@ -193,7 +196,8 @@ export default function Home() {
       p_challenge_id: ch.id,
       p_initial_state: newGame() as unknown as Record<string, unknown>,
     })
-    if (!error && data) navigate(`/game/${data}`)
+    if (error) { console.error('[acceptDirect]', error); alert(`Erro ao aceitar desafio: ${error.message}`) }
+    else if (data) navigate(`/game/${data}`)
     setIncoming(prev => prev.filter(c => c.id !== ch.id))
     setBusy(false)
   }
