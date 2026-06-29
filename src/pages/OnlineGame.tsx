@@ -290,39 +290,49 @@ export default function OnlineGame() {
       const isLastFrom = lastMove?.from?.r === r && lastMove?.from?.c === c
       const isLastTo   = lastMove?.to.r === r && lastMove?.to.c === c
       const inChk = cell?.t === 'K' && inCheck(state!, cell.o) && !over
-
       const isLight = (r + c) % 2 === 1
-      const bg = inChk ? theme.checkSq
-        : isSelected ? theme.selSq
-        : isLastFrom || isLastTo ? theme.lastMove
-        : isLight ? theme.sqL : theme.sqD
+
+      let bg = settings.alt ? (isLight ? theme.sqL : theme.sqD) : theme.sq
+      if (isSelected) bg = theme.selSq
+      if (inChk) bg = theme.checkSq
 
       return (
         <div
-          key={`${r},${c}`}
+          key={`${vr},${vc}`}
           onClick={() => handleSquare(vr, vc)}
           style={{
             position: 'relative',
             background: bg,
+            borderRight:  vc < 8 ? '1px solid rgba(58,42,20,.35)' : 'none',
+            borderBottom: vr < 8 ? '1px solid rgba(58,42,20,.35)' : 'none',
             cursor: isMyTurn && !over ? 'pointer' : 'default',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
           }}
         >
+          {/* last move highlight */}
+          {(isLastFrom || isLastTo) && (
+            <div style={{ position: 'absolute', inset: 0, background: theme.lastMove, pointerEvents: 'none' }} />
+          )}
+          {cell && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <PieceSVG cell={cell} set={settings.set} fill />
+            </div>
+          )}
           {/* drop target dot */}
           {t && !cell && (
             <div style={{
-              position: 'absolute', width: '30%', height: '30%', borderRadius: '50%',
-              background: 'rgba(212,168,48,.7)', pointerEvents: 'none',
+              position: 'absolute', top: '50%', left: '50%',
+              transform: 'translate(-50%,-50%)', width: '28%', height: '28%',
+              borderRadius: '50%', background: theme.tgt, pointerEvents: 'none',
             }} />
           )}
           {/* capture ring */}
           {t && cell && (
             <div style={{
-              position: 'absolute', inset: '3px', borderRadius: '50%',
-              border: '2px solid rgba(212,168,48,.8)', pointerEvents: 'none',
+              position: 'absolute', inset: '5%', borderRadius: '50%',
+              border: `4px solid ${theme.tgt}`, pointerEvents: 'none',
             }} />
           )}
-          {cell && <PieceSVG cell={cell} set={settings.set} fill />}
         </div>
       )
     }))
@@ -362,15 +372,38 @@ export default function OnlineGame() {
 
       {/* board */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: 0 }}>
-        <div style={{ position: 'relative', aspectRatio: '1', maxWidth: 'min(96vw, 96vh - 200px)', width: '100%' }}>
+        <div style={{ position: 'relative', aspectRatio: '1', maxWidth: 'min(96vw, calc(96vh - 200px))', width: '100%' }}>
+          {/* board frame with rank/file labels */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gridTemplateRows: 'repeat(9, 1fr)',
-            width: '100%', height: '100%',
-            background: theme.frame, borderRadius: '8px', padding: '4px', gap: '1px',
+            position: 'relative', width: '100%', height: '100%',
+            background: theme.frame, borderRadius: '8px',
+            padding: '8px 8px 20px 20px',
             boxShadow: '0 8px 24px rgba(0,0,0,.4)',
           }}>
-            {renderBoard()}
-          </div>
+            {/* rank labels (1-9) on left */}
+            <div style={{ position: 'absolute', left: 0, top: '8px', bottom: '20px', width: '20px', display: 'flex', flexDirection: 'column' }}>
+              {(myColor === 'd'
+                ? Array.from({ length: 9 }, (_, i) => i + 1)
+                : Array.from({ length: 9 }, (_, i) => 9 - i)
+              ).map(n => (
+                <span key={n} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{n}</span>
+              ))}
+            </div>
+            {/* file labels (A-I) at bottom */}
+            <div style={{ position: 'absolute', left: '20px', right: '8px', bottom: 0, height: '20px', display: 'flex' }}>
+              {(myColor === 'd' ? 'IHGFEDCBA' : 'ABCDEFGHI').split('').map(l => (
+                <span key={l} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{l}</span>
+              ))}
+            </div>
+            {/* board grid */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gridTemplateRows: 'repeat(9, 1fr)',
+              width: '100%', height: '100%',
+              border: `1.5px solid ${theme.gridBorder}`,
+              borderRadius: '4px', overflow: 'hidden',
+            }}>
+              {renderBoard()}
+            </div>
 
           {/* promotion dialog */}
           {pendingPromo && (
@@ -405,6 +438,7 @@ export default function OnlineGame() {
               </div>
             </div>
           )}
+          </div>{/* end frame */}
         </div>
       </div>
 
