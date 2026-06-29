@@ -22,6 +22,19 @@ interface IncomingChallenge {
   profiles: { username: string; rating: number }
 }
 
+interface FriendEntry {
+  id: string
+  friendId: string
+  username: string
+  rating: number
+}
+
+interface FriendReq {
+  id: string
+  from_id: string
+  profiles: { username: string; rating: number }
+}
+
 interface ActiveGame {
   id: string
   opponentName: string
@@ -60,6 +73,10 @@ export default function Home() {
   const [pendingChalId, setPendingChalId]   = useState<string | null>(null)
   const [pendingChalTo, setPendingChalTo]   = useState<string | null>(null)
   const [activeGames, setActiveGames]   = useState<ActiveGame[]>([])
+  const [directChalTc, setDirectChalTc] = useState(0)
+  const [friends, setFriends]           = useState<FriendEntry[]>([])
+  const [friendReqs, setFriendReqs]     = useState<FriendReq[]>([])
+  const [challengingFriend, setChallengingFriend] = useState<string | null>(null)
 
   const myLobbyRef = useRef<string | null>(null)
   myLobbyRef.current = myLobbyId
@@ -97,6 +114,57 @@ export default function Home() {
           time_control_inc:  g.time_control_inc  as number | null,
         })))
       })
+  }, [user])
+
+  /* ── load friends ── */
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('friends')
+      .select('id, from_id, to_id, from_profile:profiles!friends_from_id_fkey(username,rating), to_profile:profiles!friends_to_id_fkey(username,rating)')
+      .or(`from_id.eq.${user.id},to_id.eq.${user.id}`)
+      .eq('status', 'accepted')
+      .then(({ data }) => {
+        if (!data) return
+        setFriends(data.map((f: Record<string, unknown>) => {
+          const isFrom = f.from_id === user.id
+          const fp = isFrom ? (f.to_profile as { username: string; rating: number } | null) : (f.from_profile as { username: string; rating: number } | null)
+          return {
+            id: f.id as string,
+            friendId: (isFrom ? f.to_id : f.from_id) as string,
+            username: fp?.username ?? 'Desconhecido',
+            rating: fp?.rating ?? 1500,
+          }
+        }))
+      })
+  }, [user])
+
+  /* ── load pending friend requests ── */
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('friends')
+      .select('id, from_id, profiles!friends_from_id_fkey(username,rating)')
+      .eq('to_id', user.id)
+      .eq('status', 'pending')
+      .then(({ data }) => { if (data) setFriendReqs(data as unknown as FriendReq[]) })
+  }, [user])
+
+  /* ── realtime: incoming friend requests ── */
+  useEffect(() => {
+    if (!user) return
+    const ch = supabase.channel('friends-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'friends', filter: `to_id=eq.${user.id}` },
+        async payload => {
+          const { data } = await supabase
+            .from('friends')
+            .select('id, from_id, profiles!friends_from_id_fkey(username,rating)')
+            .eq('id', (payload.new as { id: string }).id)
+            .single()
+          if (data) setFriendReqs(prev => [data as unknown as FriendReq, ...prev])
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
   }, [user])
 
   /* ── realtime: lobby table ── */
@@ -231,7 +299,7 @@ export default function Home() {
   async function sendDirectChallenge() {
     if (!searchResult || !profile) return
     setBusy(true)
-    const tc = TC_OPTIONS[selectedTc]
+    const tc = TC_OPTIONS[directChalTc]
     const { data, error } = await supabase
       .from('challenges')
       .insert({
@@ -273,6 +341,46 @@ export default function Home() {
     setBusy(false)
   }
 
+  async function sendFriendRequest(toId: string, toUsername: string) {
+    if (!profile) return
+    const { error } = await supabase.from('friends').insert({ from_id: profile.id, to_id: toId })
+    if (!error) { setSearchMsg(`Pedido enviado para ${toUsername}!`); setSearchResult(null) }
+    else setSearchMsg('Já existe um pedido pendente.')
+  }
+
+  async function acceptFriendReq(req: FriendReq) {
+    await supabase.from('friends').update({ status: 'accepted' }).eq('id', req.id)
+    setFriendReqs(prev => prev.filter(r => r.id !== req.id))
+    setFriends(prev => [...prev, {
+      id: req.id,
+      friendId: req.from_id,
+      username: req.profiles?.username ?? 'Desconhecido',
+      rating: req.profiles?.rating ?? 1500,
+    }])
+  }
+
+  async function declineFriendReq(reqId: string) {
+    await supabase.from('friends').update({ status: 'declined' }).eq('id', reqId)
+    setFriendReqs(prev => prev.filter(r => r.id !== reqId))
+  }
+
+  async function challengeFriend(friendId: string, friendName: string) {
+    if (!profile) return
+    setBusy(true)
+    const tc = TC_OPTIONS[directChalTc]
+    const { data, error } = await supabase
+      .from('challenges')
+      .insert({ from_id: profile.id, to_id: friendId, time_control_secs: tc.secs, time_control_inc: tc.inc })
+      .select('id')
+      .single()
+    if (!error && data) {
+      setPendingChalId((data as { id: string }).id)
+      setPendingChalTo(friendName)
+      setChallengingFriend(null)
+    }
+    setBusy(false)
+  }
+
   async function declineChallenge(id: string) {
     await supabase.from('challenges').update({ status: 'declined' }).eq('id', id)
     setIncoming(prev => prev.filter(c => c.id !== id))
@@ -297,6 +405,17 @@ export default function Home() {
         )}
         <button onClick={signOut} style={ghostBtn}>⇥ Sair</button>
       </header>
+
+      {/* incoming friend requests */}
+      {friendReqs.map(req => (
+        <div key={req.id} style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', flex: 1 }}>
+            <b>{req.profiles?.username}</b> quer ser seu amigo
+          </span>
+          <button onClick={() => acceptFriendReq(req)} style={accentBtn}>Aceitar</button>
+          <button onClick={() => declineFriendReq(req.id)} style={ghostBtn}>Recusar</button>
+        </div>
+      ))}
 
       {/* incoming direct challenges */}
       {incoming.map(ch => (
@@ -386,14 +505,65 @@ export default function Home() {
                 </div>
                 {searchMsg && <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted)', fontFamily: '"Space Mono",monospace' }}>{searchMsg}</p>}
                 {searchResult && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 10px' }}>
-                    <span style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '11px' }}>
-                      {searchResult.username} · ⭐{searchResult.rating}
-                    </span>
-                    <button onClick={sendDirectChallenge} disabled={busy} style={accentBtn}>Desafiar</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '11px' }}>
+                        {searchResult.username} · ⭐{searchResult.rating}
+                      </span>
+                      <button onClick={() => sendFriendRequest(searchResult.id, searchResult.username)} style={ghostBtn}>+ Amigo</button>
+                      <button onClick={sendDirectChallenge} disabled={busy} style={accentBtn}>Desafiar</button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {TC_OPTIONS.map((tc, i) => (
+                        <button key={i} onClick={() => setDirectChalTc(i)} style={{ fontFamily: '"Space Mono",monospace', fontSize: '9px', padding: '3px 7px', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--line)', background: directChalTc === i ? 'var(--accent)' : 'var(--panel)', color: directChalTc === i ? '#fff' : 'var(--ink)' }}>
+                          {tc.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </>
+            )}
+          </section>
+
+          {/* friends */}
+          <section style={card}>
+            <h2 style={cardTitle}>Amigos</h2>
+            {friends.length === 0 ? (
+              <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '11px', color: 'var(--muted)', opacity: .6 }}>Nenhum amigo ainda.</span>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {friends.map(f => (
+                  <div key={f.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button onClick={() => navigate(`/profile/${f.username}`)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', flex: 1 }}>
+                        <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '11px', fontWeight: 700 }}>{f.username}</span>
+                        <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)', marginLeft: '6px' }}>⭐{f.rating}</span>
+                      </button>
+                      <button
+                        onClick={() => setChallengingFriend(challengingFriend === f.friendId ? null : f.friendId)}
+                        style={{ ...accentBtn, fontSize: '10px', padding: '5px 9px' }}
+                      >
+                        Desafiar
+                      </button>
+                    </div>
+                    {challengingFriend === f.friendId && (
+                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {TC_OPTIONS.map((tc, i) => (
+                            <button key={i} onClick={() => setDirectChalTc(i)} style={{ fontFamily: '"Space Mono",monospace', fontSize: '9px', padding: '3px 7px', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--line)', background: directChalTc === i ? 'var(--accent)' : 'var(--panel2)', color: directChalTc === i ? '#fff' : 'var(--ink)' }}>
+                              {tc.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={() => challengeFriend(f.friendId, f.username)} disabled={busy} style={{ ...accentBtn, width: '100%' }}>
+                          Enviar desafio
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </section>
         </div>

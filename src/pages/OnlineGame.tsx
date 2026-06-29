@@ -28,6 +28,7 @@ interface GameRow {
   dark_id: string
   state_json: GameState
   notation_json: { cell: Cell; text: string }[]
+  last_move_json: { from?: { r: number; c: number }; to: { r: number; c: number } } | null
   time_control_secs: number | null
   time_control_inc: number | null
   clock_light_ms: number | null
@@ -83,6 +84,7 @@ export default function OnlineGame() {
         const g = data as GameRow
         setGame(g)
         setState(g.state_json)
+        if (g.last_move_json) setLastMove(g.last_move_json)
         initClocks(g)
       })
   }, [id])
@@ -101,6 +103,7 @@ export default function OnlineGame() {
           const g = payload.new as GameRow
           setGame(g)
           setState(g.state_json)
+          if (g.last_move_json) setLastMove(g.last_move_json)
           initClocks(g)
           sounds.move()
         })
@@ -188,7 +191,7 @@ export default function OnlineGame() {
     const mv = { from: { r: fr, c: fc }, to: { r: tr, c: tc }, promote }
     const next = apply(state, mv)
     const notationText = coord(tr, tc) + (cap ? '×' : '') + (promote ? '+' : '')
-    await saveMove(next, { cell, text: notationText }, fr, fc, tr, tc)
+    await saveMove(next, { cell, text: notationText }, { from: { r: fr, c: fc }, to: { r: tr, c: tc } })
   }
 
   async function doDrop(htype: HandType, r: number, c: number) {
@@ -197,13 +200,13 @@ export default function OnlineGame() {
     const mv = { drop: htype, to: { r, c } }
     const next = apply(state, mv)
     const notationText = coord(r, c)
-    await saveMove(next, { cell: { t: htype, o: myColor!, p: false }, text: `*${notationText}` })
+    await saveMove(next, { cell: { t: htype, o: myColor!, p: false }, text: `*${notationText}` }, { to: { r, c } })
   }
 
   async function saveMove(
     next: GameState,
     notationEntry: { cell: Cell; text: string },
-    fr?: number, fc?: number, tr?: number, tc?: number
+    lm?: { from?: { r: number; c: number }; to: { r: number; c: number } }
   ) {
     if (!game) return
     setSaving(true)
@@ -224,6 +227,7 @@ export default function OnlineGame() {
     const { error } = await supabase.from('games').update({
       state_json: next,
       notation_json: newNotation,
+      last_move_json: lm ?? null,
       clock_light_ms: clockLightMs,
       clock_dark_ms:  clockDarkMs,
       last_move_at:   clockLightMs !== null ? new Date(now).toISOString() : null,
@@ -234,8 +238,7 @@ export default function OnlineGame() {
     if (error) setErrorMsg('Erro ao salvar jogada.')
     else {
       setState(next)
-      if (fr !== undefined && tr !== undefined)
-        setLastMove({ from: { r: fr, c: fc! }, to: { r: tr, c: tc! } })
+      if (lm) setLastMove(lm)
       if (status.over) {
         sounds.gameOver()
         triggerElo(game.id, status.winner ?? 'draw')
@@ -340,12 +343,18 @@ export default function OnlineGame() {
 
   const lightLabel = game.light_profile?.username ?? 'Claro'
   const darkLabel  = game.dark_profile?.username  ?? 'Escuro'
-  const topLabel   = myColor === 'd' ? lightLabel : darkLabel
-  const botLabel   = myColor === 'd' ? darkLabel  : lightLabel
   const topOwner: Owner = myColor === 'd' ? 'l' : 'd'
   const botOwner: Owner = myColor === 'd' ? 'd' : 'l'
+  const topLabel   = topOwner === 'l' ? lightLabel : darkLabel
+  const botLabel   = botOwner === 'l' ? lightLabel : darkLabel
   const topClockMs = topOwner === 'l' ? clockDisplay.l : clockDisplay.d
   const botClockMs = botOwner === 'l' ? clockDisplay.l : clockDisplay.d
+  const hasClock   = !!game.clock_light_ms
+  const opponentName = myColor === 'l' ? darkLabel : lightLabel
+  const winnerName   = !game.winner ? null : game.winner === 'l' ? lightLabel : darkLabel
+  const tcStr = game.time_control_secs
+    ? `${Math.floor(game.time_control_secs / 60)}${game.time_control_inc ? `+${game.time_control_inc}` : ' min'}`
+    : 'Sem tempo'
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -355,96 +364,136 @@ export default function OnlineGame() {
       <header style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <button onClick={() => navigate('/')} style={ghostBtn}>← Lobby</button>
         <div style={{ flex: 1, fontFamily: '"Space Mono",monospace', fontSize: '11px', color: 'var(--muted)', textAlign: 'center' }}>
-          {game.time_control_secs
-            ? `${Math.floor(game.time_control_secs / 60)}${game.time_control_inc ? `+${game.time_control_inc}` : ' min'}`
-            : 'Sem tempo'}
-          {saving && <span style={{ marginLeft: '8px', opacity: .6 }}>...</span>}
+          vs <b style={{ color: 'var(--ink)' }}>{opponentName}</b>
+          <span style={{ marginLeft: '8px', opacity: .6 }}>{tcStr}</span>
+          {saving && <span style={{ marginLeft: '8px', opacity: .5 }}>...</span>}
+          {inCheck(state, state.turn) && !over && <span style={{ marginLeft: '8px', color: 'var(--warn)', fontWeight: 700 }}>Xeque!</span>}
         </div>
         {!over && myColor && (
-          <button onClick={resign} style={{ ...ghostBtn, color: 'var(--warn)', borderColor: 'var(--warn)' }}>Render</button>
+          <button onClick={resign} style={{ ...ghostBtn, color: 'var(--warn)', borderColor: 'var(--warn)' }}>Desistir</button>
         )}
       </header>
 
-      {/* opponent hand (top) */}
-      <div style={{ padding: '8px 12px 4px' }}>
-        <OnlineHandPanel owner={topOwner} state={state} isMe={false} label={topLabel} clockMs={topClockMs} hasClock={!!game.clock_light_ms} activeTurn={state.turn === topOwner && !over} settings={settings} onChip={() => {}} />
-      </div>
+      {/* body: game + notation panel */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 
-      {/* board */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: 0 }}>
-        <div style={{ position: 'relative', aspectRatio: '1', maxWidth: 'min(96vw, calc(96vh - 200px))', width: '100%' }}>
-          {/* board frame with rank/file labels */}
-          <div style={{
-            position: 'relative', width: '100%', height: '100%',
-            background: theme.frame, borderRadius: '8px',
-            padding: '8px 8px 20px 20px',
-            boxShadow: '0 8px 24px rgba(0,0,0,.4)',
-          }}>
-            {/* rank labels (1-9) on left */}
-            <div style={{ position: 'absolute', left: 0, top: '8px', bottom: '20px', width: '20px', display: 'flex', flexDirection: 'column' }}>
-              {(myColor === 'd'
-                ? Array.from({ length: 9 }, (_, i) => i + 1)
-                : Array.from({ length: 9 }, (_, i) => 9 - i)
-              ).map(n => (
-                <span key={n} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{n}</span>
-              ))}
-            </div>
-            {/* file labels (A-I) at bottom */}
-            <div style={{ position: 'absolute', left: '20px', right: '8px', bottom: 0, height: '20px', display: 'flex' }}>
-              {(myColor === 'd' ? 'IHGFEDCBA' : 'ABCDEFGHI').split('').map(l => (
-                <span key={l} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{l}</span>
-              ))}
-            </div>
-            {/* board grid */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gridTemplateRows: 'repeat(9, 1fr)',
-              width: '100%', height: '100%',
-              border: `1.5px solid ${theme.gridBorder}`,
-              borderRadius: '4px', overflow: 'hidden',
-            }}>
-              {renderBoard()}
-            </div>
+        {/* center: hands + board */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px', gap: '6px', minWidth: 0 }}>
 
-          {/* promotion dialog */}
-          {pendingPromo && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}>
-              <div style={{ background: 'var(--panel)', borderRadius: '14px', padding: '20px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)' }}>Promover?</div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {[true, false].map(p => (
-                    <button key={String(p)} onClick={() => resolvePromo(p)} style={{ width: '54px', height: '60px', background: 'var(--panel2)', border: '1px solid var(--line)', borderRadius: '10px', cursor: 'pointer', position: 'relative' }}>
-                      <PieceSVG cell={{ ...pendingPromo.cell, p }} set={settings.set} fill noFlip />
-                    </button>
+          {/* opponent hand */}
+          <div style={{ width: '100%', maxWidth: '680px' }}>
+            <OnlineHandPanel owner={topOwner} state={state} isMe={false} label={topLabel} clockMs={topClockMs} hasClock={hasClock} activeTurn={state.turn === topOwner && !over} settings={settings} onChip={() => {}} />
+          </div>
+
+          {/* board */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: '680px', minHeight: 0 }}>
+            <div style={{ position: 'relative', aspectRatio: '1', maxWidth: 'min(100%, calc(100vh - 220px))', width: '100%' }}>
+              <div style={{
+                position: 'relative', width: '100%', height: '100%',
+                background: theme.frame, borderRadius: '8px',
+                padding: '8px 8px 20px 20px',
+                boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+              }}>
+                {/* rank labels */}
+                <div style={{ position: 'absolute', left: 0, top: '8px', bottom: '20px', width: '20px', display: 'flex', flexDirection: 'column' }}>
+                  {(myColor === 'd'
+                    ? Array.from({ length: 9 }, (_, i) => i + 1)
+                    : Array.from({ length: 9 }, (_, i) => 9 - i)
+                  ).map(n => (
+                    <span key={n} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{n}</span>
                   ))}
                 </div>
-                <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)' }}>
-                  {pendingPromo.cell.t} → sim / não
+                {/* file labels */}
+                <div style={{ position: 'absolute', left: '20px', right: '8px', bottom: 0, height: '20px', display: 'flex' }}>
+                  {(myColor === 'd' ? 'IHGFEDCBA' : 'ABCDEFGHI').split('').map(l => (
+                    <span key={l} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Space Mono",monospace', fontSize: '9px', color: theme.label, opacity: .72 }}>{l}</span>
+                  ))}
                 </div>
-              </div>
-            </div>
-          )}
+                {/* board grid */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gridTemplateRows: 'repeat(9, 1fr)',
+                  width: '100%', height: '100%',
+                  border: `1.5px solid ${theme.gridBorder}`,
+                  borderRadius: '4px', overflow: 'hidden',
+                }}>
+                  {renderBoard()}
+                </div>
 
-          {/* game over overlay */}
-          {over && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}>
-              <div style={{ background: 'var(--panel)', borderRadius: '16px', padding: '28px 36px', textAlign: 'center' }}>
-                <div style={{ fontFamily: '"Space Grotesk",sans-serif', fontWeight: 800, fontSize: '26px', color: 'var(--accent)', marginBottom: '6px' }}>
-                  {!game.winner ? 'Empate' : game.winner === myColor ? 'Vitória!' : 'Derrota'}
-                </div>
-                <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)', marginBottom: '20px' }}>
-                  {!game.winner ? '½ - ½' : `${game.winner === 'l' ? lightLabel : darkLabel} venceu`}
-                </div>
-                <button onClick={() => navigate('/')} style={{ ...ghostBtn, width: '100%' }}>← Lobby</button>
+                {/* promotion dialog */}
+                {pendingPromo && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}>
+                    <div style={{ background: 'var(--panel)', borderRadius: '14px', padding: '20px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)' }}>Promover?</div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        {[true, false].map(p => (
+                          <button key={String(p)} onClick={() => resolvePromo(p)} style={{ width: '54px', height: '60px', background: 'var(--panel2)', border: '1px solid var(--line)', borderRadius: '10px', cursor: 'pointer', position: 'relative' }}>
+                            <PieceSVG cell={{ ...pendingPromo.cell, p }} set={settings.set} fill noFlip />
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)' }}>
+                        {pendingPromo.cell.t} → sim / não
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* game over overlay */}
+                {over && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}>
+                    <div style={{ background: 'var(--panel)', borderRadius: '16px', padding: '28px 36px', textAlign: 'center', minWidth: '200px' }}>
+                      <div style={{ fontFamily: '"Space Grotesk",sans-serif', fontWeight: 800, fontSize: '26px', color: 'var(--accent)', marginBottom: '6px' }}>
+                        {!game.winner ? 'Empate' : game.winner === myColor ? 'Você venceu!' : `${winnerName} venceu`}
+                      </div>
+                      <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '12px', color: 'var(--muted)', marginBottom: '20px' }}>
+                        {!game.winner ? '½ - ½' : `${lightLabel} × ${darkLabel}`}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button
+                          onClick={() => navigate(`/?challenge=${opponentName}`)}
+                          style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px', fontFamily: '"Space Mono",monospace', fontSize: '12px', cursor: 'pointer', fontWeight: 700 }}
+                        >
+                          Revanche
+                        </button>
+                        <button onClick={() => navigate('/')} style={{ ...ghostBtn, width: '100%' }}>← Lobby</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-          </div>{/* end frame */}
+          </div>
+
+          {/* my hand */}
+          <div style={{ width: '100%', maxWidth: '680px' }}>
+            <OnlineHandPanel owner={botOwner} state={state} isMe={!!myColor} label={botLabel} clockMs={botClockMs} hasClock={hasClock} activeTurn={state.turn === botOwner && !over} settings={settings} onChip={handleHand} />
+          </div>
         </div>
-      </div>
 
-      {/* my hand (bottom) */}
-      <div style={{ padding: '4px 12px 8px' }}>
-        <OnlineHandPanel owner={botOwner} state={state} isMe={!!myColor} label={botLabel} clockMs={botClockMs} hasClock={!!game.clock_light_ms} activeTurn={state.turn === botOwner && !over} settings={settings} onChip={handleHand} />
+        {/* notation panel — hidden on mobile, sidebar on desktop */}
+        <aside className="hidden lg:flex" style={{ width: '200px', flexShrink: 0, flexDirection: 'column', borderLeft: '1px solid var(--line)', padding: '12px 10px', gap: '8px', overflow: 'hidden' }}>
+          <div style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', flexShrink: 0 }}>
+            Lances
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {(game.notation_json ?? []).map((entry, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 6px', borderRadius: '6px',
+                background: i === (game.notation_json ?? []).length - 1 ? 'var(--panel2)' : 'transparent',
+              }}>
+                <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '9px', color: 'var(--muted)', minWidth: '20px', textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <div style={{ position: 'relative', width: '20px', height: '22px', flexShrink: 0 }}>
+                  <PieceSVG cell={entry.cell} set={settings.set} fill />
+                </div>
+                <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--ink)' }}>{entry.text}</span>
+              </div>
+            ))}
+            {!(game.notation_json ?? []).length && (
+              <span style={{ fontFamily: '"Space Mono",monospace', fontSize: '10px', color: 'var(--muted)', opacity: .5, padding: '6px' }}>nenhum lance</span>
+            )}
+          </div>
+        </aside>
+
       </div>
     </div>
   )

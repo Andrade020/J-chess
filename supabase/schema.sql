@@ -54,6 +54,17 @@ create table public.lobby (
   created_at        timestamptz not null default now()
 );
 
+-- Amizades
+create table public.friends (
+  id         uuid        primary key default gen_random_uuid(),
+  from_id    uuid        not null references public.profiles(id) on delete cascade,
+  to_id      uuid        not null references public.profiles(id) on delete cascade,
+  status     text        not null default 'pending'
+                         check (status in ('pending','accepted','declined')),
+  created_at timestamptz not null default now(),
+  unique(from_id, to_id)
+);
+
 -- Desafios diretos (user → user)
 create table public.challenges (
   id                uuid        primary key default gen_random_uuid(),
@@ -65,6 +76,21 @@ create table public.challenges (
                                 check (status in ('pending','accepted','declined','expired')),
   created_at        timestamptz not null default now()
 );
+
+-- ── RLS: friends ─────────────────────────────────────────────
+alter table public.friends enable row level security;
+
+create policy "friends_select" on public.friends for select
+  using (auth.uid() = from_id or auth.uid() = to_id);
+
+create policy "friends_insert" on public.friends for insert
+  with check (auth.uid() = from_id);
+
+create policy "friends_update" on public.friends for update
+  using (auth.uid() = to_id or auth.uid() = from_id);
+
+create policy "friends_delete" on public.friends for delete
+  using (auth.uid() = from_id or auth.uid() = to_id);
 
 -- ── Triggers ─────────────────────────────────────────────────
 
@@ -166,8 +192,14 @@ grant insert on public.challenges to authenticated;
 grant update on public.challenges to authenticated;
 grant delete on public.challenges to authenticated;
 
+grant select on public.friends to authenticated;
+grant insert on public.friends to authenticated;
+grant update on public.friends to authenticated;
+grant delete on public.friends to authenticated;
+
 -- ── Realtime ─────────────────────────────────────────────────
 -- Habilita mudanças em tempo real nas tabelas relevantes
 alter publication supabase_realtime add table public.games;
 alter publication supabase_realtime add table public.lobby;
 alter publication supabase_realtime add table public.challenges;
+alter publication supabase_realtime add table public.friends;
